@@ -314,7 +314,7 @@ O uso de ferramentas de inteligência artificial durante o desenvolvimento é pe
 
 Caso sejam utilizadas ferramentas de IA, as configurações, instruções ou arquivos utilizados para orientar os agentes deverão ser mantidos dentro do repositório do projeto.
 
-Também será avaliada a forma como o candidato utiliza e configura agentes de IA no processo de desenvolvimento. \
+Também será avaliada a forma como o candidato utiliza e configura agentes de IA no processo de desenvolvimento.
 
 Boas práticas no uso serão consideradas de forma positiva.
 
