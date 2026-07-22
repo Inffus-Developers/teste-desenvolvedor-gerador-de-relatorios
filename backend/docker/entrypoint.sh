@@ -15,4 +15,4 @@ fi
 
 php artisan migrate --seed --force
 
-exec php -S 0.0.0.0:8000 -t public
+exec php -d "memory_limit=${PHP_MEMORY_LIMIT:-512M}" -S 0.0.0.0:8000 -t public

@@ -685,7 +685,7 @@ O CSV é enviado como resposta em streaming, com BOM UTF-8 e separador `;`. A co
 
 #### PDF e grandes volumes
 
-O PDF possui cabeçalho, filtros, totalizadores, tabela e numeração de páginas em A4 paisagem. Como renderizadores HTML para PDF precisam manter a árvore do documento em memória, o sistema limita a exportação a `REPORT_PDF_MAX_ROWS`, padrão de 2.000 registros. Acima do limite, a API retorna `422` e orienta o uso de CSV.
+O PDF possui cabeçalho, filtros, totalizadores, tabela e numeração de páginas em A4 paisagem. Como renderizadores HTML para PDF precisam manter a árvore do documento em memória, o sistema limita a exportação a `REPORT_PDF_MAX_ROWS`, padrão de 1.000 registros. O worker HTTP usa `PHP_MEMORY_LIMIT=512M` por padrão. Acima do limite de linhas, a API retorna `422` e orienta o uso de CSV.
 
 Em produção, PDFs maiores devem ser gerados de forma assíncrona em filas, divididos em arquivos menores quando necessário e armazenados temporariamente em object storage com link de expiração. O limite síncrono protege workers HTTP contra esgotamento de memória e timeout.
 
