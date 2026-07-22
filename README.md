@@ -439,7 +439,7 @@ Não é necessário implementar funcionalidades além das solicitadas. O foco de
 
 ### Estado atual
 
-Etapa 7 — performance: geração configurável de dados em lotes, índices por base de período e testes isolados do banco local.
+Etapa 8 — finalização: requisitos obrigatórios implementados, dependências reproduzíveis, qualidade automatizada e homologação funcional concluída.
 
 ### Como executar
 
@@ -478,7 +478,9 @@ O comando acima preserva os dados. Para remover os volumes deliberadamente, use 
 
 ```bash
 docker compose config
+docker compose exec backend vendor/bin/pint --test
 docker compose exec backend php artisan test
+docker compose exec frontend npm run lint
 docker compose exec frontend npm run build
 ```
 
@@ -751,3 +753,36 @@ Para executar somente os testes do gerador e dos índices:
 ```bash
 docker compose exec backend php artisan test --filter=GeneratePerformanceDataTest
 ```
+
+### Checklist final da entrega
+
+Os requisitos obrigatórios foram concluídos e validados:
+
+* autenticação com login, logout e proteção da API;
+* gestão de clientes e cobranças;
+* registro de pagamentos e congelamento dos juros pagos;
+* juros compostos calculados no backend;
+* relatório com filtros, ordenação, paginação e totalizadores no banco;
+* exportações CSV por streaming e PDF com limite de segurança;
+* busca de clientes nos seletores de cobrança e relatório, inclusive fora das primeiras páginas;
+* geração configurável de dados em volume;
+* índices para os principais caminhos de consulta;
+* ambiente completo em Docker Compose;
+* testes backend isolados em SQLite em memória;
+* dependências PHP e JavaScript fixadas em lockfiles;
+* instruções de IA versionadas em `AGENTS.md`.
+
+Na homologação local foram conferidos login/logout, cadastro e busca, cobrança e pagamento, cálculo de juros, relatório, filtros, totalizadores, CSV, PDF e layout móvel. Com 592 linhas filtradas, o PDF foi gerado em aproximadamente 6 segundos e produziu um arquivo de cerca de 172 KB no ambiente de desenvolvimento.
+
+#### Pontos não implementados
+
+Não há requisito obrigatório conhecido pendente. Os seguintes itens citados como diferenciais não foram implementados para manter o foco no escopo do teste:
+
+* testes automatizados do frontend;
+* controle de acesso por perfil;
+* documentação OpenAPI;
+* pipeline de integração contínua;
+* monitoramento, observabilidade e cobertura de testes publicada;
+* cache de totalizadores.
+
+Esses pontos podem ser adicionados posteriormente sem alterar os contratos principais da API.
