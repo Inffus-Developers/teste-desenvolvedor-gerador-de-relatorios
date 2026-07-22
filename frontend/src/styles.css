@@ -75,6 +75,9 @@ th { color: #657187; font-size: .75rem; letter-spacing: .06em; text-transform: u
 .status { display: inline-flex; border-radius: 999px; padding: .3rem .65rem; font-size: .75rem; font-weight: 800; }
 .status--active { color: #17643d; background: #eaf8f0; }
 .status--inactive { color: #6b7280; background: #eef1f4; }
+.status--pending { color: #765a00; background: #fff6cf; }
+.status--overdue { color: #8f1d2c; background: #fff0f1; }
+.status--paid { color: #17643d; background: #eaf8f0; }
 .pagination { display: flex; align-items: center; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; color: #657187; font-size: .9rem; }
 .pagination .button { padding: .6rem .9rem; }
 .empty-state { padding: 3rem 1rem; color: #657187; text-align: center; }
@@ -88,6 +91,10 @@ th { color: #657187; font-size: .75rem; letter-spacing: .06em; text-transform: u
 .detail-grid div { padding: 1rem; border-radius: .8rem; background: #f7f9fb; }
 .detail-grid dt { margin-bottom: .35rem; color: #657187; font-size: .78rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .detail-grid dd { margin: 0; font-weight: 700; }
+.module-nav { display: flex; max-width: 72rem; margin: 0 auto 1rem; padding: .3rem; border-radius: .8rem; background: #e8edf3; width: fit-content; }
+.module-nav button { border: 0; border-radius: .6rem; padding: .7rem 1rem; color: #657187; background: transparent; font-weight: 800; }
+.module-nav button.is-active { color: #087f8c; background: #fff; box-shadow: 0 .2rem .8rem rgb(31 49 69 / 10%); }
+.page-feedback { max-width: 72rem; margin: 0 auto; }
 
 @media (max-width: 800px) {
   .auth-layout { grid-template-columns: 1fr; align-content: center; }

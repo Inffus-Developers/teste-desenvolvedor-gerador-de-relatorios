@@ -3,6 +3,7 @@ import { getAuthenticatedUser, login, logout } from './services/auth'
 import { ApiError } from './services/api'
 import type { User } from './types/auth'
 import { CustomerModule } from './components/customers/CustomerModule'
+import { BillingModule } from './components/billings/BillingModule'
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -12,6 +13,7 @@ function App() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [activeModule, setActiveModule] = useState<'customers' | 'billings'>('customers')
 
   useEffect(() => {
     const token = sessionStorage.getItem('auth_token')
@@ -88,9 +90,12 @@ function App() {
           </button>
         </header>
 
-        {feedback && <div className="alert alert--success" role="status">{feedback}</div>}
-
-        <CustomerModule />
+        <nav className="module-nav" aria-label="Módulos do sistema">
+          <button className={activeModule === 'customers' ? 'is-active' : ''} onClick={() => setActiveModule('customers')}>Clientes</button>
+          <button className={activeModule === 'billings' ? 'is-active' : ''} onClick={() => setActiveModule('billings')}>Cobranças</button>
+        </nav>
+        {feedback && <div className="alert alert--success page-feedback" role="status">{feedback}</div>}
+        {activeModule === 'customers' ? <CustomerModule /> : <BillingModule />}
       </main>
     )
   }

@@ -3,6 +3,7 @@ import type { Customer, CustomerPage, CustomerPayload, CustomerStatus } from '..
 
 export type CustomerQuery = {
   page?: number
+  per_page?: number
   search?: string
   status?: CustomerStatus | ''
   sort?: 'name' | 'document' | 'email' | 'status' | 'created_at'
