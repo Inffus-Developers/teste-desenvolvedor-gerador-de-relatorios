@@ -347,9 +347,28 @@ Os commits também serão considerados durante a avaliação.
 
 ## Entrega
 
-O projeto deverá ser desenvolvido a partir do repositório disponibilizado para o teste.
+O candidato deverá realizar a entrega seguindo obrigatoriamente este fluxo:
 
-Ao finalizar, o candidato deverá abrir um Pull Request no repositório com a solução completa.
+1. Criar um **fork** do repositório disponibilizado para o teste.
+2. Criar uma nova branch dentro do fork utilizando o próprio nome.
+
+Exemplo:
+
+```text
+joao-silva
+```
+
+3. Desenvolver toda a solução nessa branch.
+4. Manter o histórico de commits pequenos, semânticos e separados por responsabilidade.
+5. Ao finalizar, abrir um **Pull Request da branch criada no fork para o repositório original do teste**.
+
+Exemplo do fluxo:
+
+```text
+fork-do-candidato:joao-silva
+    ↓
+repositorio-original:main
+```
 
 O Pull Request deverá conter:
 
@@ -377,9 +396,9 @@ O repositório deverá conter:
 * Explicação das decisões técnicas
 * Explicação da estratégia de performance
 
-Não serão aceitas entregas por arquivo compactado, e-mail ou outro repositório externo.
+Não serão aceitas entregas por arquivo compactado, e-mail, link para outro repositório ou qualquer outro meio externo.
 
-A resposta do teste deverá ser enviada exclusivamente por meio do Pull Request aberto no repositório disponibilizado.
+A entrega deverá ser realizada exclusivamente por meio do Pull Request aberto a partir do fork do candidato para o repositório original disponibilizado para o teste.
 
 ---
 
