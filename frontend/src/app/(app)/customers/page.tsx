@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Alert, Loading, PageTitle, Pagination, SelectField } from "@/components/ui";
+import { Alert, Loading, PageTitle, Pagination, SelectField, TableShell } from "@/components/ui";
 import { api, queryString } from "@/lib/api";
 import type { ApiError, Customer, PaginatedResponse } from "@/types/api";
 import { paginationOf } from "@/types/api";
@@ -48,7 +48,7 @@ export default function CustomersPage() {
         }
       />
       <Alert error={error} />
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div className="form-shell mb-4 grid gap-3 sm:grid-cols-3">
         <input
           className="input"
           placeholder="Buscar por nome, documento ou e-mail"
@@ -74,26 +74,28 @@ export default function CustomersPage() {
       {loading ? (
         <Loading />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+        <TableShell>
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="px-4 py-3">Nome</th>
-                <th className="px-4 py-3">Documento</th>
-                <th className="px-4 py-3">E-mail</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3" />
+                <th>Nome</th>
+                <th>Documento</th>
+                <th>E-mail</th>
+                <th>Status</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {items.map((customer) => (
-                <tr key={customer.id} className="border-b border-slate-100">
-                  <td className="px-4 py-3 font-medium text-slate-900">{customer.name}</td>
-                  <td className="px-4 py-3">{customer.document}</td>
-                  <td className="px-4 py-3">{customer.email}</td>
-                  <td className="px-4 py-3 capitalize">{customer.status === "active" ? "Ativo" : "Inativo"}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/customers/${customer.id}`} className="text-slate-700 underline">
+                <tr key={customer.id}>
+                  <td className="font-medium text-[var(--color-ink)]">{customer.name}</td>
+                  <td>{customer.document}</td>
+                  <td>{customer.email}</td>
+                  <td>
+                    <span className="badge">{customer.status === "active" ? "Ativo" : "Inativo"}</span>
+                  </td>
+                  <td className="text-right">
+                    <Link href={`/customers/${customer.id}`} className="link-accent">
                       Ver
                     </Link>
                   </td>
@@ -101,14 +103,14 @@ export default function CustomersPage() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={5} className="py-8 text-center text-muted">
                     Nenhum cliente encontrado.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
+        </TableShell>
       )}
       <Pagination page={page} lastPage={lastPage} onPage={setPage} />
     </div>

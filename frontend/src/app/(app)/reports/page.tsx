@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Alert, Field, Loading, PageTitle, Pagination, SelectField } from "@/components/ui";
+import { Alert, Field, Loading, PageTitle, Pagination, SelectField, StatCard, TableShell } from "@/components/ui";
 import { api, download, money, pollReportExport, queryString, queueReportExport } from "@/lib/api";
 import type {
   ApiError,
@@ -137,7 +137,7 @@ export default function ReportsPage() {
       <PageTitle title="Relatório de faturamento" />
       <Alert error={error} success={success} />
 
-      <form onSubmit={onFilterSubmit} className="mb-6 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3">
+      <form onSubmit={onFilterSubmit} className="form-shell mb-6 grid gap-3 md:grid-cols-3">
         <Field
           label="Data inicial"
           type="date"
@@ -212,63 +212,67 @@ export default function ReportsPage() {
       </form>
 
       {queuedExport && queueExporting && (
-        <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
-          Exportação em fila: <strong>{queuedExport.status}</strong>
+        <div className="surface-card mb-4 p-4 text-sm text-secondary">
+          Exportação em fila: <strong className="text-[var(--color-ink)]">{queuedExport.status}</strong>
           {queuedExport.row_count ? ` · ${queuedExport.row_count} linhas` : ""}
         </div>
       )}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <TotalCard label="Quantidade" value={String(totals.count)} />
-        <TotalCard label="Valor original" value={money(totals.original_total)} />
-        <TotalCard label="Total de juros" value={money(totals.interest_total)} />
-        <TotalCard label="Valor atualizado" value={money(totals.updated_total)} />
-        <TotalCard label="Total recebido" value={money(totals.received_total)} />
-        <TotalCard label="Total pendente" value={money(totals.pending_total)} />
+        <StatCard label="Quantidade" value={String(totals.count)} tabular />
+        <StatCard label="Valor original" value={money(totals.original_total)} tabular />
+        <StatCard label="Total de juros" value={money(totals.interest_total)} tabular />
+        <StatCard label="Valor atualizado" value={money(totals.updated_total)} tabular />
+        <StatCard label="Total recebido" value={money(totals.received_total)} tabular />
+        <StatCard label="Total pendente" value={money(totals.pending_total)} tabular />
       </div>
 
       {loading ? (
         <Loading />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+        <TableShell>
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="px-3 py-3">Cliente</th>
-                <th className="px-3 py-3">Descrição</th>
-                <th className="px-3 py-3">Emissão</th>
-                <th className="px-3 py-3">Vencimento</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3">Original</th>
-                <th className="px-3 py-3">Juros</th>
-                <th className="px-3 py-3">Atualizado</th>
-                <th className="px-3 py-3">Pago</th>
+                <th>Cliente</th>
+                <th>Descrição</th>
+                <th>Emissão</th>
+                <th>Vencimento</th>
+                <th>Status</th>
+                <th>Original</th>
+                <th>Juros</th>
+                <th>Atualizado</th>
+                <th>Pago</th>
               </tr>
             </thead>
             <tbody>
               {items.map((billing) => (
-                <tr key={billing.id} className="border-b border-slate-100">
-                  <td className="px-3 py-3">{billing.customer?.name ?? "-"}</td>
-                  <td className="px-3 py-3">{billing.description}</td>
-                  <td className="px-3 py-3">{billing.issue_date}</td>
-                  <td className="px-3 py-3">{billing.due_date}</td>
-                  <td className="px-3 py-3">{statusLabel[billing.status] ?? billing.status}</td>
-                  <td className="px-3 py-3">{money(billing.original_amount)}</td>
-                  <td className="px-3 py-3">{money(billing.interest_amount)}</td>
-                  <td className="px-3 py-3">{money(billing.updated_amount)}</td>
-                  <td className="px-3 py-3">{billing.paid_amount ? money(billing.paid_amount) : "-"}</td>
+                <tr key={billing.id}>
+                  <td>{billing.customer?.name ?? "-"}</td>
+                  <td>{billing.description}</td>
+                  <td className="tabular-nums">{billing.issue_date}</td>
+                  <td className="tabular-nums">{billing.due_date}</td>
+                  <td>
+                    <span className="badge">{statusLabel[billing.status] ?? billing.status}</span>
+                  </td>
+                  <td className="tabular-nums">{money(billing.original_amount)}</td>
+                  <td className="tabular-nums">{money(billing.interest_amount)}</td>
+                  <td className="tabular-nums font-medium text-[var(--color-ink)]">
+                    {money(billing.updated_amount)}
+                  </td>
+                  <td className="tabular-nums">{billing.paid_amount ? money(billing.paid_amount) : "-"}</td>
                 </tr>
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={9} className="py-8 text-center text-muted">
                     Nenhum registro para os filtros informados.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
+        </TableShell>
       )}
       <Pagination
         page={page}
@@ -282,11 +286,3 @@ export default function ReportsPage() {
   );
 }
 
-function TotalCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-lg font-semibold text-slate-900">{value}</div>
-    </div>
-  );
-}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Alert, Loading, PageTitle, Pagination, SelectField } from "@/components/ui";
+import { Alert, Loading, PageTitle, Pagination, SelectField, TableShell } from "@/components/ui";
 import { api, money, queryString } from "@/lib/api";
 import type { ApiError, Billing, Customer, PaginatedResponse } from "@/types/api";
 import { paginationOf } from "@/types/api";
@@ -70,7 +70,7 @@ export default function BillingsPage() {
         }
       />
       <Alert error={error} />
-      <div className="mb-4 grid gap-3 md:grid-cols-4">
+      <div className="form-shell mb-4 grid gap-3 md:grid-cols-4">
         <SelectField
           label="Cliente"
           value={customerId}
@@ -114,28 +114,32 @@ export default function BillingsPage() {
       {loading ? (
         <Loading />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+        <TableShell>
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Descrição</th>
-                <th className="px-4 py-3">Vencimento</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Valor atualizado</th>
-                <th className="px-4 py-3" />
+                <th>Cliente</th>
+                <th>Descrição</th>
+                <th>Vencimento</th>
+                <th>Status</th>
+                <th>Valor atualizado</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {items.map((billing) => (
-                <tr key={billing.id} className="border-b border-slate-100">
-                  <td className="px-4 py-3">{billing.customer?.name ?? billing.customer_id}</td>
-                  <td className="px-4 py-3">{billing.description}</td>
-                  <td className="px-4 py-3">{billing.due_date}</td>
-                  <td className="px-4 py-3">{statusLabel[billing.status] ?? billing.status}</td>
-                  <td className="px-4 py-3">{money(billing.updated_amount)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/billings/${billing.id}`} className="underline">
+                <tr key={billing.id}>
+                  <td>{billing.customer?.name ?? billing.customer_id}</td>
+                  <td>{billing.description}</td>
+                  <td className="tabular-nums">{billing.due_date}</td>
+                  <td>
+                    <span className="badge">{statusLabel[billing.status] ?? billing.status}</span>
+                  </td>
+                  <td className="tabular-nums font-medium text-[var(--color-ink)]">
+                    {money(billing.updated_amount)}
+                  </td>
+                  <td className="text-right">
+                    <Link href={`/billings/${billing.id}`} className="link-accent">
                       Ver
                     </Link>
                   </td>
@@ -143,14 +147,14 @@ export default function BillingsPage() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="py-8 text-center text-muted">
                     Nenhuma cobrança encontrada.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
+        </TableShell>
       )}
       <Pagination page={page} lastPage={lastPage} onPage={setPage} />
     </div>

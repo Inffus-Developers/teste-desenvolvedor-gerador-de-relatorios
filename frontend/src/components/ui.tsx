@@ -30,16 +30,27 @@ export function ProtectedShell({ children }: { children: ReactNode }) {
     ["/billings", "Cobranças"],
     ["/reports", "Relatórios"],
   ];
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="app-shell">
+      <header className="app-header">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link href="/customers" className="font-semibold text-slate-900">Inffus Billing</Link>
+          <Link href="/customers" className="app-brand">
+            Inffus Billing
+          </Link>
           <nav className="flex items-center gap-1">
             {links.map(([href, label]) => (
-              <Link key={href} href={href} className={`rounded-md px-3 py-2 text-sm font-medium ${pathname.startsWith(href) ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:text-slate-900"}`}>{label}</Link>
+              <Link
+                key={href}
+                href={href}
+                className={`app-nav-link ${pathname.startsWith(href) ? "app-nav-link-active" : ""}`}
+              >
+                {label}
+              </Link>
             ))}
-            <button onClick={logout} className="ml-2 rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">Sair</button>
+            <button type="button" onClick={logout} className="btn-ghost ml-1">
+              Sair
+            </button>
           </nav>
         </div>
       </header>
@@ -49,35 +60,126 @@ export function ProtectedShell({ children }: { children: ReactNode }) {
 }
 
 export function PageTitle({ title, action }: { title: string; action?: ReactNode }) {
-  return <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-semibold text-slate-900">{title}</h1>{action}</div>;
+  return (
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <h1 className="page-title">{title}</h1>
+      {action}
+    </div>
+  );
 }
 
 export function Alert({ error, success }: { error?: ApiError | string | null; success?: string | null }) {
   const errorMessage = typeof error === "string" ? error : error?.message;
-  return <>{errorMessage && <div role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorMessage}</div>}{success && <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</div>}</>;
+
+  return (
+    <>
+      {errorMessage && (
+        <div role="alert" className="alert-error">
+          {errorMessage}
+        </div>
+      )}
+      {success && (
+        <div role="status" className="alert-success">
+          {success}
+        </div>
+      )}
+    </>
+  );
 }
 
 export function Loading() {
-  return <div className="py-12 text-center text-sm text-slate-500">Carregando…</div>;
+  return <div className="py-12 text-center text-sm text-muted">Carregando…</div>;
 }
 
-export function Pagination({ page, lastPage, onPage }: { page: number; lastPage: number; onPage: (page: number) => void }) {
+export function Pagination({
+  page,
+  lastPage,
+  onPage,
+}: {
+  page: number;
+  lastPage: number;
+  onPage: (page: number) => void;
+}) {
   if (lastPage <= 1) return null;
-  return <div className="mt-4 flex items-center justify-end gap-3 text-sm"><button disabled={page <= 1} onClick={() => onPage(page - 1)} className="btn-secondary disabled:opacity-50">Anterior</button><span className="text-slate-600">Página {page} de {lastPage}</span><button disabled={page >= lastPage} onClick={() => onPage(page + 1)} className="btn-secondary disabled:opacity-50">Próxima</button></div>;
+
+  return (
+    <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+      <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)} className="btn-secondary">
+        Anterior
+      </button>
+      <span className="text-muted">
+        Página {page} de {lastPage}
+      </span>
+      <button type="button" disabled={page >= lastPage} onClick={() => onPage(page + 1)} className="btn-secondary">
+        Próxima
+      </button>
+    </div>
+  );
 }
 
-export function Field({ label, error, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
-  return <label className="block text-sm font-medium text-slate-700">{label}<input {...props} className="input mt-1" />{error && <span className="mt-1 block text-xs font-normal text-red-600">{error}</span>}</label>;
+export function Field({
+  label,
+  error,
+  id,
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
+  const fieldId = id ?? props.name;
+
+  return (
+    <div className={className}>
+      <label htmlFor={fieldId} className="field-label">
+        {label}
+      </label>
+      <input
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${fieldId}-error` : undefined}
+        {...props}
+        className="input mt-1.5"
+      />
+      {error && (
+        <span id={`${fieldId}-error`} role="alert" className="mt-1.5 block text-xs text-[var(--color-ruby)]">
+          {error}
+        </span>
+      )}
+    </div>
+  );
 }
 
-export function SelectField({ label, children, ...props }: { label: string; children: ReactNode } & React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <label className="block text-sm font-medium text-slate-700">{label}<select {...props} className="input mt-1">{children}</select></label>;
+export function SelectField({
+  label,
+  children,
+  className,
+  ...props
+}: { label: string; children: ReactNode; className?: string } & React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <label className={className ?? "block"}>
+      <span className="field-label">{label}</span>
+      <select {...props} className="select mt-1.5">
+        {children}
+      </select>
+    </label>
+  );
 }
 
 export function Form({ children, className, ...props }: FormHTMLAttributes<HTMLFormElement>) {
   return (
-    <form {...props} className={className ?? "rounded-lg border border-slate-200 bg-white p-5 shadow-sm"}>
+    <form {...props} className={className ?? "form-shell space-y-4"}>
       {children}
     </form>
+  );
+}
+
+export function TableShell({ children }: { children: ReactNode }) {
+  return <div className="table-shell">{children}</div>;
+}
+
+export function StatCard({ label, value, tabular = false }: { label: string; value: string; tabular?: boolean }) {
+  return (
+    <div className="stat-card">
+      <div className="stat-card-label">{label}</div>
+      <div className={`stat-card-value ${tabular ? "tabular-nums" : ""}`}>{value}</div>
+    </div>
   );
 }

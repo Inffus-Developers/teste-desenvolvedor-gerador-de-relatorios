@@ -11,5 +11,5 @@ export default function HomePage() {
     router.replace(getToken() ? "/customers" : "/login");
   }, [router]);
 
-  return <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Redirecionando…</div>;
+  return <div className="flex min-h-screen items-center justify-center text-sm text-muted">Redirecionando…</div>;
 }
