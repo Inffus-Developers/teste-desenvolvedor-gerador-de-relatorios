@@ -437,7 +437,7 @@ Não é necessário implementar funcionalidades além das solicitadas. O foco de
 
 ### Estado atual
 
-Etapa 5 — relatórios: relatório de faturamento paginado com filtros, ordenação e totalizadores calculados no banco de dados.
+Etapa 6 — exportações: relatório paginado e exportações CSV/PDF com os mesmos filtros e totalizadores.
 
 ### Como executar
 
@@ -662,4 +662,33 @@ Para executar os testes do relatório:
 
 ```bash
 docker compose exec backend php artisan test --filter=BillingReportTest
+```
+
+### Exportação do relatório
+
+Na tela do relatório, use **Exportar CSV** ou **Exportar PDF**. As duas opções reutilizam a mesma validação, consulta, filtros, ordenação, cálculo de juros e totalizadores exibidos na tela.
+
+Endpoints protegidos:
+
+```text
+GET /api/reports/billings/export/csv
+GET /api/reports/billings/export/pdf
+```
+
+Todos os parâmetros aceitos pelo relatório devem ser enviados também à exportação. Os arquivos incluem período, base do período, cliente, status, dados e totalizadores.
+
+#### CSV e grandes volumes
+
+O CSV é enviado como resposta em streaming, com BOM UTF-8 e separador `;`. A consulta usa `lazy` em blocos configuráveis por `REPORT_CSV_CHUNK_SIZE` — padrão de 1.000 registros — e escreve cada linha diretamente em `php://output`. Assim, a memória da aplicação permanece limitada ao bloco atual, mesmo quando o resultado possui muitos registros.
+
+#### PDF e grandes volumes
+
+O PDF possui cabeçalho, filtros, totalizadores, tabela e numeração de páginas em A4 paisagem. Como renderizadores HTML para PDF precisam manter a árvore do documento em memória, o sistema limita a exportação a `REPORT_PDF_MAX_ROWS`, padrão de 2.000 registros. Acima do limite, a API retorna `422` e orienta o uso de CSV.
+
+Em produção, PDFs maiores devem ser gerados de forma assíncrona em filas, divididos em arquivos menores quando necessário e armazenados temporariamente em object storage com link de expiração. O limite síncrono protege workers HTTP contra esgotamento de memória e timeout.
+
+Para executar os testes das exportações:
+
+```bash
+docker compose exec backend php artisan test --filter=BillingReportExportTest
 ```
