@@ -104,6 +104,7 @@ th { color: #657187; font-size: .75rem; letter-spacing: .06em; text-transform: u
 .total-card strong { font-size: 1.15rem; }
 .total-card--positive { border-color: #bfe7cf; background: #f2fbf6; }
 .total-card--warning { border-color: #f1d98b; background: #fffbeb; }
+.report-actions { display: flex; gap: .7rem; }
 
 @media (max-width: 800px) {
   .auth-layout { grid-template-columns: 1fr; align-content: center; }
@@ -114,6 +115,8 @@ th { color: #657187; font-size: .75rem; letter-spacing: .06em; text-transform: u
   .field--wide { grid-column: auto; }
   .form-actions { grid-column: auto; }
   .report-filters, .totals-grid { grid-template-columns: 1fr; }
+  .report-actions { width: 100%; }
+  .report-actions .button { flex: 1; }
 }
 
 @media (min-width: 801px) and (max-width: 1200px) {

@@ -1,7 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../services/api'
 import { listCustomers } from '../../services/customers'
-import { getBillingReport } from '../../services/reports'
+import { exportBillingReport, getBillingReport } from '../../services/reports'
 import type { BillingStatus } from '../../types/billing'
 import type { Customer } from '../../types/customer'
 import type { BillingReport, PeriodBasis, ReportFilters } from '../../types/report'
@@ -26,6 +26,7 @@ export function BillingReportModule() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isExporting, setIsExporting] = useState<'csv' | 'pdf' | null>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -47,9 +48,27 @@ export function BillingReportModule() {
     setApplied((current) => ({ ...current, page: 1, sort, direction: current.sort === sort && current.direction === 'asc' ? 'desc' : 'asc' }))
   }
 
+  async function download(format: 'csv' | 'pdf') {
+    setIsExporting(format)
+    setError('')
+    try {
+      const { blob, filename } = await exportBillingReport(format, applied)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : 'Não foi possível exportar o relatório.')
+    } finally {
+      setIsExporting(null)
+    }
+  }
+
   return (
     <section className="panel report-panel">
-      <div className="panel__heading"><div><span className="eyebrow">Análise</span><h2>Relatório de faturamento</h2><p>Valores calculados para o período e os filtros selecionados.</p></div></div>
+      <div className="panel__heading"><div><span className="eyebrow">Análise</span><h2>Relatório de faturamento</h2><p>Valores calculados para o período e os filtros selecionados.</p></div><div className="report-actions"><button className="button button--secondary" disabled={isExporting !== null || isLoading} onClick={() => void download('csv')}>{isExporting === 'csv' ? 'Gerando CSV...' : 'Exportar CSV'}</button><button className="button" disabled={isExporting !== null || isLoading} onClick={() => void download('pdf')}>{isExporting === 'pdf' ? 'Gerando PDF...' : 'Exportar PDF'}</button></div></div>
 
       <form className="report-filters" onSubmit={applyFilters}>
         <label className="field">Data inicial<input type="date" value={draft.date_from} onChange={(event) => setDraft((current) => ({ ...current, date_from: event.target.value }))} required /></label>

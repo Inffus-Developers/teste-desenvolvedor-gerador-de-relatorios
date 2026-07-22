@@ -42,3 +42,27 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
 
   return response.json() as Promise<T>
 }
+
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string }> {
+  const token = sessionStorage.getItem('auth_token')
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: {
+      Accept: 'application/pdf, text/csv',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload
+    throw new ApiError(
+      payload.errors?.export?.[0] ?? payload.message ?? 'Não foi possível exportar o relatório.',
+      response.status,
+      payload.errors,
+    )
+  }
+
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? 'relatorio'
+
+  return { blob: await response.blob(), filename }
+}
