@@ -437,7 +437,7 @@ Não é necessário implementar funcionalidades além das solicitadas. O foco de
 
 ### Estado atual
 
-Etapa 3 — clientes: fundação Dockerizada, autenticação completa e gestão de clientes pela API e pelo React.
+Etapa 4 — cobranças: autenticação, clientes, cobranças, cálculo de juros e registro de pagamentos disponíveis pela API e pelo React.
 
 ### Como executar
 
@@ -565,3 +565,49 @@ docker compose exec backend php artisan test --filter=CustomerApiTest
 ```
 
 A tabela `customers` possui índices únicos em documento e e-mail, índice em nome e índice composto em status/nome. Eles atendem à identificação única, à ordenação padrão por nome e à listagem frequente por status seguida de nome.
+
+### Gestão de cobranças
+
+No menu **Cobranças**, o usuário pode cadastrar, editar, listar e visualizar cobranças, além de registrar pagamentos. Cobranças pagas ficam bloqueadas para edição a fim de preservar os dados financeiros históricos.
+
+Cada cobrança contém cliente, descrição, valor original, emissão, vencimento, taxa mensal de juros e status. Ao registrar o pagamento, também são armazenados:
+
+* data do pagamento;
+* valor efetivamente pago;
+* valor dos juros calculados na data do pagamento.
+
+Endpoints protegidos:
+
+| Método | Endpoint | Finalidade |
+| --- | --- | --- |
+| `GET` | `/api/billings` | Listar, filtrar, ordenar e paginar |
+| `POST` | `/api/billings` | Cadastrar cobrança |
+| `GET` | `/api/billings/{id}` | Visualizar cobrança e valores atualizados |
+| `PUT/PATCH` | `/api/billings/{id}` | Editar cobrança ainda não paga |
+| `POST` | `/api/billings/{id}/payment` | Registrar pagamento |
+
+#### Regra de juros
+
+Foi adotado o cálculo de **juros compostos pro rata por dia**. A taxa mensal é informada e armazenada como percentual — por exemplo, `3` representa 3% ao mês — e o backend aplica:
+
+```text
+valor_atualizado = valor_original × (1 + taxa_mensal / 100) ^ (dias_em_atraso / 30)
+juros = valor_atualizado - valor_original
+```
+
+Os dias em atraso são contados do vencimento até a data atual. Uma cobrança não vencida tem juros iguais a zero. O resultado monetário é arredondado para duas casas decimais.
+
+O valor atualizado de cobranças pendentes é calculado em tempo real e não é persistido. No pagamento, o backend calcula os juros usando a data informada, grava esse valor em `interest_paid` e muda o status para `paid`. Depois disso, a cobrança não acumula novos juros.
+
+#### Índices das cobranças
+
+* `(status, due_date)`: listagens de pendentes, vencidas e pagas por vencimento;
+* `(customer_id, issue_date)`: consultas e futuros relatórios de um cliente por emissão;
+* `payment_date`: relatórios baseados em recebimento;
+* `created_at`: ordenação administrativa e paginação por criação.
+
+Para executar somente os testes desta etapa:
+
+```bash
+docker compose exec backend php artisan test --filter=BillingApiTest
+```
