@@ -175,9 +175,4 @@ frontend/          Next.js
 docker-compose.yml backend, frontend, mysql, rabbitmq, report-worker
 .github/workflows/ CI
 .env.example
-.cursor/           instruções usadas no desenvolvimento assistido por IA
 ```
-
-## Uso de IA no desenvolvimento
-
-Foi utilizado suporte de agentes de IA durante a implementação. As orientações ficam em `.cursor/rules/`.
