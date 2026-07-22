@@ -21,6 +21,7 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:-Administrador}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-password}
+      REPORT_PDF_MAX_ROWS: ${REPORT_PDF_MAX_ROWS:-2000}
     volumes:
       - ./backend:/var/www/html
       - backend_vendor:/var/www/html/vendor
