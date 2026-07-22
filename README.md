@@ -318,6 +318,8 @@ Também será avaliada a forma como o candidato utiliza e configura agentes de I
 
 Boas práticas no uso serão consideradas de forma positiva.
 
+Neste desenvolvimento foi utilizado o Codex como assistente para implementação, validação e organização do fluxo Git. As orientações persistentes fornecidas aos agentes estão registradas em [`AGENTS.md`](AGENTS.md). Todas as alterações foram revisadas e validadas localmente antes da integração, e nenhum segredo ou credencial pessoal foi incluído no repositório.
+
 ---
 
 ## Organização dos commits
@@ -449,3 +451,357 @@ Prazo de entrega sugerido: até 5 dias corridos.
 O teste foi planejado para exigir aproximadamente 8 a 12 horas de desenvolvimento.
 
 Não é necessário implementar funcionalidades além das solicitadas. O foco deve estar na qualidade da solução, nas decisões técnicas e na clareza da implementação.
+
+---
+
+## Implementação
+
+### Estado atual
+
+Etapa 8 — finalização: requisitos obrigatórios implementados, dependências reproduzíveis, qualidade automatizada e homologação funcional concluída.
+
+### Como executar
+
+Requisitos: Docker Desktop com Docker Compose.
+
+1. Copie as variáveis de ambiente da raiz:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   No Windows PowerShell, use `Copy-Item .env.example .env`.
+
+2. Construa e inicie todos os serviços:
+
+   ```bash
+   docker compose up --build
+   ```
+
+3. Acesse:
+
+   * Frontend: http://localhost:5173
+   * API/backend: http://localhost:8000
+
+O backend aguarda o MySQL ficar saudável, instala dependências quando necessário e executa as migrations automaticamente. Os dados do MySQL ficam persistidos no volume `mysql_data`.
+
+Para encerrar os serviços:
+
+```bash
+docker compose down
+```
+
+O comando acima preserva os dados. Para remover os volumes deliberadamente, use `docker compose down --volumes`.
+
+### Como validar a fundação
+
+```bash
+docker compose config
+docker compose exec backend vendor/bin/pint --test
+docker compose exec backend php artisan test
+docker compose exec frontend npm run lint
+docker compose exec frontend npm run build
+```
+
+### Estrutura
+
+* `backend/`: API Laravel e testes automatizados.
+* `frontend/`: aplicação React/TypeScript com Vite.
+* `docker-compose.yml`: orquestra backend, frontend e MySQL.
+
+As instruções serão ampliadas ao final de cada etapa funcional.
+
+### Autenticação
+
+Não há cadastro público de usuários. Ao iniciar o ambiente, o seeder cria ou atualiza o administrador definido no `.env` da raiz:
+
+```dotenv
+ADMIN_NAME=Administrador
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=password
+```
+
+Altere essas credenciais antes de usar o sistema fora do ambiente local. Depois de atualizar um ambiente já iniciado, execute:
+
+```bash
+docker compose exec backend php artisan db:seed --force
+```
+
+No frontend, acesse http://localhost:5173 e informe as credenciais configuradas. O token de acesso fica no `sessionStorage`, é enviado como Bearer token para a API e é removido ao sair ou quando a sessão deixa de ser válida.
+
+Endpoints disponíveis:
+
+| Método | Endpoint | Autenticação | Finalidade |
+| --- | --- | --- | --- |
+| `POST` | `/api/login` | Pública, limitada a 5 tentativas por minuto | Autenticar e emitir token |
+| `GET` | `/api/user` | Bearer token | Consultar usuário autenticado |
+| `POST` | `/api/logout` | Bearer token | Revogar o token atual |
+
+Exemplo de login pela API:
+
+```bash
+curl -X POST http://localhost:8000/api/login \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"password"}'
+```
+
+Para executar os testes de autenticação:
+
+```bash
+docker compose exec backend php artisan test --filter=AuthenticationTest
+```
+
+### Gestão de clientes
+
+Após o login, a tela inicial exibe o módulo de clientes. O usuário pode:
+
+* listar clientes com paginação no backend;
+* buscar por nome, documento ou e-mail;
+* filtrar por status ativo ou inativo;
+* ordenar por nome, documento, e-mail ou status;
+* cadastrar, visualizar e editar clientes.
+
+Os campos nome, documento, e-mail e status são obrigatórios. Documento e e-mail devem ser únicos.
+
+Endpoints protegidos disponíveis:
+
+| Método | Endpoint | Finalidade |
+| --- | --- | --- |
+| `GET` | `/api/customers` | Listar, filtrar, ordenar e paginar |
+| `POST` | `/api/customers` | Cadastrar cliente |
+| `GET` | `/api/customers/{id}` | Visualizar cliente |
+| `PUT/PATCH` | `/api/customers/{id}` | Editar cliente |
+
+Parâmetros aceitos na listagem:
+
+* `page` e `per_page` — página e quantidade, limitada a 100 registros;
+* `search` — busca em nome, documento e e-mail;
+* `status` — `active` ou `inactive`;
+* `sort` — `name`, `document`, `email`, `status` ou `created_at`;
+* `direction` — `asc` ou `desc`.
+
+Para executar somente os testes de clientes:
+
+```bash
+docker compose exec backend php artisan test --filter=CustomerApiTest
+```
+
+A tabela `customers` possui índices únicos em documento e e-mail, índice em nome e índice composto em status/nome. Eles atendem à identificação única, à ordenação padrão por nome e à listagem frequente por status seguida de nome.
+
+### Gestão de cobranças
+
+No menu **Cobranças**, o usuário pode cadastrar, editar, listar e visualizar cobranças, além de registrar pagamentos. Cobranças pagas ficam bloqueadas para edição a fim de preservar os dados financeiros históricos.
+
+Cada cobrança contém cliente, descrição, valor original, emissão, vencimento, taxa mensal de juros e status. Ao registrar o pagamento, também são armazenados:
+
+* data do pagamento;
+* valor efetivamente pago;
+* valor dos juros calculados na data do pagamento.
+
+Endpoints protegidos:
+
+| Método | Endpoint | Finalidade |
+| --- | --- | --- |
+| `GET` | `/api/billings` | Listar, filtrar, ordenar e paginar |
+| `POST` | `/api/billings` | Cadastrar cobrança |
+| `GET` | `/api/billings/{id}` | Visualizar cobrança e valores atualizados |
+| `PUT/PATCH` | `/api/billings/{id}` | Editar cobrança ainda não paga |
+| `POST` | `/api/billings/{id}/payment` | Registrar pagamento |
+
+#### Regra de juros
+
+Foi adotado o cálculo de **juros compostos pro rata por dia**. A taxa mensal é informada e armazenada como percentual — por exemplo, `3` representa 3% ao mês — e o backend aplica:
+
+```text
+valor_atualizado = valor_original × (1 + taxa_mensal / 100) ^ (dias_em_atraso / 30)
+juros = valor_atualizado - valor_original
+```
+
+Os dias em atraso são contados do vencimento até a data atual. Uma cobrança não vencida tem juros iguais a zero. O resultado monetário é arredondado para duas casas decimais.
+
+O valor atualizado de cobranças pendentes é calculado em tempo real e não é persistido. No pagamento, o backend calcula os juros usando a data informada, grava esse valor em `interest_paid` e muda o status para `paid`. Depois disso, a cobrança não acumula novos juros.
+
+#### Índices das cobranças
+
+* `(status, due_date)`: listagens de pendentes, vencidas e pagas por vencimento;
+* `(customer_id, issue_date)`: consultas e futuros relatórios de um cliente por emissão;
+* `payment_date`: relatórios baseados em recebimento;
+* `created_at`: ordenação administrativa e paginação por criação.
+
+Para executar somente os testes desta etapa:
+
+```bash
+docker compose exec backend php artisan test --filter=BillingApiTest
+```
+
+### Relatório de faturamento
+
+No menu **Relatórios**, selecione a data inicial, data final e a base do período:
+
+* data de emissão;
+* data de vencimento;
+* data de pagamento.
+
+Também é possível filtrar por cliente e status (`pending`, `overdue` ou `paid`). A tabela exibe cliente, descrição, emissão, vencimento, status, valor original, juros, valor atualizado e valor pago.
+
+O endpoint protegido é:
+
+```text
+GET /api/reports/billings
+```
+
+Parâmetros obrigatórios:
+
+* `date_from`;
+* `date_to`;
+* `period_basis`: `issue_date`, `due_date` ou `payment_date`.
+
+Parâmetros opcionais:
+
+* `customer_id`;
+* `status`;
+* `sort` e `direction`;
+* `page` e `per_page`, limitado a 100 registros por página.
+
+Os totalizadores retornados são quantidade de cobranças, valor original total, total de juros, valor atualizado total, valor recebido e valor pendente.
+
+#### Estratégia de consulta e performance
+
+Os filtros e a ordenação são aplicados pelo MySQL antes da paginação. A consulta das linhas usa eager loading do cliente com seleção apenas de `id` e `name`, evitando N+1. Somente a página solicitada é materializada pela aplicação.
+
+Os seis totalizadores são calculados em uma única consulta de agregação no banco. A fórmula dos juros compõe uma subconsulta SQL, portanto nenhuma coleção completa de cobranças é carregada em PHP. Para cobranças pagas, a agregação usa os juros congelados em `interest_paid`; para pendentes vencidas, usa `POWER` e `DATEDIFF` do MySQL com a data atual.
+
+Os índices definidos na tabela de cobranças atendem aos principais caminhos do relatório:
+
+* `(status, due_date)` para status e vencimento;
+* `(customer_id, issue_date)` para cliente e emissão;
+* `payment_date` para períodos de recebimento;
+* `created_at` para ordenação administrativa.
+
+Com milhões de registros, o banco continua filtrando, ordenando e agregando sem transferir todas as linhas para a aplicação. Páginas muito profundas e agregações sobre períodos excessivamente amplos ainda podem ser custosas. Em produção, as próximas otimizações seriam paginação por cursor para navegação sequencial, réplica de leitura, cache de totalizadores por conjunto de filtros, tabelas de resumo por dia/cliente e processamento assíncrono de períodos muito grandes.
+
+Para executar os testes do relatório:
+
+```bash
+docker compose exec backend php artisan test --filter=BillingReportTest
+```
+
+### Exportação do relatório
+
+Na tela do relatório, use **Exportar CSV** ou **Exportar PDF**. As duas opções reutilizam a mesma validação, consulta, filtros, ordenação, cálculo de juros e totalizadores exibidos na tela.
+
+Endpoints protegidos:
+
+```text
+GET /api/reports/billings/export/csv
+GET /api/reports/billings/export/pdf
+```
+
+Todos os parâmetros aceitos pelo relatório devem ser enviados também à exportação. Os arquivos incluem período, base do período, cliente, status, dados e totalizadores.
+
+#### CSV e grandes volumes
+
+O CSV é enviado como resposta em streaming, com BOM UTF-8 e separador `;`. A consulta usa `lazy` em blocos configuráveis por `REPORT_CSV_CHUNK_SIZE` — padrão de 1.000 registros — e escreve cada linha diretamente em `php://output`. Assim, a memória da aplicação permanece limitada ao bloco atual, mesmo quando o resultado possui muitos registros.
+
+#### PDF e grandes volumes
+
+O PDF possui cabeçalho, filtros, totalizadores, tabela e numeração de páginas em A4 paisagem. Como renderizadores HTML para PDF precisam manter a árvore do documento em memória, o sistema limita a exportação a `REPORT_PDF_MAX_ROWS`, padrão de 1.000 registros. O worker HTTP usa `PHP_MEMORY_LIMIT=512M` por padrão. Acima do limite de linhas, a API retorna `422` e orienta o uso de CSV.
+
+Em produção, PDFs maiores devem ser gerados de forma assíncrona em filas, divididos em arquivos menores quando necessário e armazenados temporariamente em object storage com link de expiração. O limite síncrono protege workers HTTP contra esgotamento de memória e timeout.
+
+Para executar os testes das exportações:
+
+```bash
+docker compose exec backend php artisan test --filter=BillingReportExportTest
+```
+
+### Dados para testes de performance
+
+O comando abaixo gera, por padrão, 1.000 clientes e 100.000 cobranças usando as factories do projeto:
+
+```bash
+docker compose exec backend php artisan app:generate-performance-data
+```
+
+As quantidades e o tamanho dos blocos podem ser informados em cada execução:
+
+```bash
+docker compose exec backend php artisan app:generate-performance-data \
+  --customers=1000 \
+  --billings=10000 \
+  --chunk=1000
+```
+
+No Windows PowerShell, o mesmo comando pode ser escrito em uma única linha. Também é possível alterar os padrões no `.env` da raiz:
+
+```dotenv
+PERFORMANCE_CUSTOMERS=1000
+PERFORMANCE_BILLINGS=100000
+PERFORMANCE_CHUNK_SIZE=1000
+```
+
+O comando é aditivo: cada execução cria um novo conjunto de clientes e cobranças, sem apagar dados existentes. Aproximadamente um terço das cobranças geradas fica pago e o restante pendente, permitindo testar diferentes filtros e totalizadores. Em produção, há confirmação interativa; a opção `--force` deve ser usada apenas de forma deliberada.
+
+O `PerformanceDataSeeder` oferece a mesma geração com os valores do ambiente:
+
+```bash
+docker compose exec backend php artisan db:seed --class=PerformanceDataSeeder
+```
+
+#### Estratégia de geração
+
+Clientes e cobranças são materializados e inseridos em lotes configuráveis. A aplicação mantém em memória somente o lote atual de modelos e a lista de identificadores dos clientes gerados, evitando acumular todas as cobranças. Inserções em bloco também reduzem viagens ao banco em comparação com um `INSERT` por modelo.
+
+Como referência local, a geração de 1.000 clientes e 10.000 cobranças em blocos de 1.000 levou aproximadamente 5 segundos. Esse valor é apenas indicativo e varia conforme CPU, disco e recursos destinados ao Docker.
+
+#### Índices e consultas em grande volume
+
+Além dos índices compostos `(status, due_date)` e `(customer_id, issue_date)`, a tabela `billings` possui índices individuais em `issue_date`, `due_date` e `payment_date`. Os índices individuais são necessários quando o relatório filtra somente pelo período, sem cliente ou status; os compostos atendem aos filtros combinados mais frequentes.
+
+Os planos `EXPLAIN` foram conferidos no MySQL com 10.000 cobranças. Consultas por emissão e vencimento selecionaram, respectivamente, `billings_issue_date_index` e `billings_due_date_index`, com varredura por intervalo em vez de leitura integral da tabela.
+
+Com milhões de registros, a paginação, os filtros, a ordenação e os totalizadores permanecem no banco. Para produção em escala maior, as evoluções recomendadas são paginação por cursor para páginas profundas, réplicas de leitura, tabelas de resumo, cache de agregações, particionamento por data após análise da distribuição real e geração assíncrona de exportações.
+
+#### Isolamento dos testes
+
+A suíte automatizada usa SQLite em memória. Dessa forma, `php artisan test` não recria nem altera o banco MySQL utilizado pela interface. A imagem Docker inclui `pdo_sqlite` exclusivamente para essa execução isolada.
+
+Para executar somente os testes do gerador e dos índices:
+
+```bash
+docker compose exec backend php artisan test --filter=GeneratePerformanceDataTest
+```
+
+### Checklist final da entrega
+
+Os requisitos obrigatórios foram concluídos e validados:
+
+* autenticação com login, logout e proteção da API;
+* gestão de clientes e cobranças;
+* registro de pagamentos e congelamento dos juros pagos;
+* juros compostos calculados no backend;
+* relatório com filtros, ordenação, paginação e totalizadores no banco;
+* exportações CSV por streaming e PDF com limite de segurança;
+* busca de clientes nos seletores de cobrança e relatório, inclusive fora das primeiras páginas;
+* geração configurável de dados em volume;
+* índices para os principais caminhos de consulta;
+* ambiente completo em Docker Compose;
+* testes backend isolados em SQLite em memória;
+* dependências PHP e JavaScript fixadas em lockfiles;
+* instruções de IA versionadas em `AGENTS.md`.
+
+Na homologação local foram conferidos login/logout, cadastro e busca, cobrança e pagamento, cálculo de juros, relatório, filtros, totalizadores, CSV, PDF e layout móvel. Com 592 linhas filtradas, o PDF foi gerado em aproximadamente 6 segundos e produziu um arquivo de cerca de 172 KB no ambiente de desenvolvimento.
+
+#### Pontos não implementados
+
+Não há requisito obrigatório conhecido pendente. Os seguintes itens citados como diferenciais não foram implementados para manter o foco no escopo do teste:
+
+* testes automatizados do frontend;
+* controle de acesso por perfil;
+* documentação OpenAPI;
+* pipeline de integração contínua;
+* monitoramento, observabilidade e cobertura de testes publicada;
+* cache de totalizadores.
+
+Esses pontos podem ser adicionados posteriormente sem alterar os contratos principais da API.
