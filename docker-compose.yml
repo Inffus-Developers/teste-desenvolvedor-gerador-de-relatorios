@@ -18,6 +18,9 @@ services:
       DB_DATABASE: ${MYSQL_DATABASE:-billing}
       DB_USERNAME: ${MYSQL_USER:-billing}
       DB_PASSWORD: ${MYSQL_PASSWORD:-billing_secret}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-password}
     volumes:
       - ./backend:/var/www/html
       - backend_vendor:/var/www/html/vendor
