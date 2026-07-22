@@ -6,12 +6,19 @@ use App\Enums\BillingStatus;
 use App\Models\Billing;
 use App\Models\Customer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class GeneratePerformanceDataTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_suite_uses_isolated_sqlite_database(): void
+    {
+        $this->assertSame('sqlite', DB::connection()->getDriverName());
+        $this->assertSame(':memory:', config('database.connections.sqlite.database'));
+    }
 
     public function test_command_generates_customers_and_billings_in_configurable_chunks(): void
     {
