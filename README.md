@@ -437,7 +437,7 @@ Não é necessário implementar funcionalidades além das solicitadas. O foco de
 
 ### Estado atual
 
-Etapa 1 — fundação do projeto: Laravel 12, React com TypeScript, MySQL 8.4 e Docker Compose.
+Etapa 2 — autenticação: fundação Dockerizada, API protegida com Laravel Sanctum e fluxo de login/logout no React.
 
 ### Como executar
 
@@ -487,3 +487,44 @@ docker compose exec frontend npm run build
 * `docker-compose.yml`: orquestra backend, frontend e MySQL.
 
 As instruções serão ampliadas ao final de cada etapa funcional.
+
+### Autenticação
+
+Não há cadastro público de usuários. Ao iniciar o ambiente, o seeder cria ou atualiza o administrador definido no `.env` da raiz:
+
+```dotenv
+ADMIN_NAME=Administrador
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=password
+```
+
+Altere essas credenciais antes de usar o sistema fora do ambiente local. Depois de atualizar um ambiente já iniciado, execute:
+
+```bash
+docker compose exec backend php artisan db:seed --force
+```
+
+No frontend, acesse http://localhost:5173 e informe as credenciais configuradas. O token de acesso fica no `sessionStorage`, é enviado como Bearer token para a API e é removido ao sair ou quando a sessão deixa de ser válida.
+
+Endpoints disponíveis:
+
+| Método | Endpoint | Autenticação | Finalidade |
+| --- | --- | --- | --- |
+| `POST` | `/api/login` | Pública, limitada a 5 tentativas por minuto | Autenticar e emitir token |
+| `GET` | `/api/user` | Bearer token | Consultar usuário autenticado |
+| `POST` | `/api/logout` | Bearer token | Revogar o token atual |
+
+Exemplo de login pela API:
+
+```bash
+curl -X POST http://localhost:8000/api/login \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"password"}'
+```
+
+Para executar os testes de autenticação:
+
+```bash
+docker compose exec backend php artisan test --filter=AuthenticationTest
+```
