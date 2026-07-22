@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { ApiError } from '../../services/api'
 import { listCustomers } from '../../services/customers'
 import { exportBillingReport, getBillingReport } from '../../services/reports'
@@ -28,23 +28,27 @@ export function BillingReportModule() {
   const [error, setError] = useState('')
   const [isExporting, setIsExporting] = useState<'csv' | 'pdf' | null>(null)
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setError('')
-    try { setReport(await getBillingReport(applied)) }
-    catch (requestError) { setError(requestError instanceof ApiError ? requestError.message : 'Não foi possível carregar o relatório.') }
-    finally { setIsLoading(false) }
-  }, [applied])
+  useEffect(() => {
+    let ignore = false
+    getBillingReport(applied)
+      .then((response) => { if (!ignore) setReport(response) })
+      .catch((requestError) => { if (!ignore) setError(requestError instanceof ApiError ? requestError.message : 'Não foi possível carregar o relatório.') })
+      .finally(() => { if (!ignore) setIsLoading(false) })
 
-  useEffect(() => { void load() }, [load])
+    return () => { ignore = true }
+  }, [applied])
   useEffect(() => { listCustomers({ per_page: 100, sort: 'name' }).then((response) => setCustomers(response.data)).catch(() => setCustomers([])) }, [])
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setIsLoading(true)
+    setError('')
     setApplied({ ...draft, page: 1 })
   }
 
   function sortBy(sort: ReportFilters['sort']) {
+    setIsLoading(true)
+    setError('')
     setApplied((current) => ({ ...current, page: 1, sort, direction: current.sort === sort && current.direction === 'asc' ? 'desc' : 'asc' }))
   }
 
@@ -94,7 +98,7 @@ export function BillingReportModule() {
         <div className="table-scroll"><table><thead><tr><th>Cliente</th><th>Descrição</th><Sortable label="Emissão" onClick={() => sortBy('issue_date')} /><Sortable label="Vencimento" onClick={() => sortBy('due_date')} /><Sortable label="Status" onClick={() => sortBy('status')} /><Sortable label="Original" onClick={() => sortBy('original_amount')} /><th>Juros</th><th>Atualizado</th><th>Pago</th></tr></thead><tbody>{report.data.map((billing) => <tr key={billing.id}><td>{billing.customer.name}</td><td>{billing.description}</td><td>{date(billing.issue_date)}</td><td>{date(billing.due_date)}</td><td><span className={`status status--${billing.status}`}>{statusLabel(billing.status)}</span></td><td>{money(Number(billing.original_amount))}</td><td>{money(Number(billing.interest_amount))}</td><td><strong>{money(Number(billing.updated_amount))}</strong></td><td>{money(Number(billing.paid_amount ?? 0))}</td></tr>)}</tbody></table></div>
       )}
 
-      <div className="pagination"><button className="button button--secondary" disabled={report.meta.current_page <= 1 || isLoading} onClick={() => setApplied((current) => ({ ...current, page: (current.page ?? 1) - 1 }))}>Anterior</button><span>Página {report.meta.current_page} de {report.meta.last_page}</span><button className="button button--secondary" disabled={report.meta.current_page >= report.meta.last_page || isLoading} onClick={() => setApplied((current) => ({ ...current, page: (current.page ?? 1) + 1 }))}>Próxima</button></div>
+      <div className="pagination"><button className="button button--secondary" disabled={report.meta.current_page <= 1 || isLoading} onClick={() => { setIsLoading(true); setError(''); setApplied((current) => ({ ...current, page: (current.page ?? 1) - 1 })) }}>Anterior</button><span>Página {report.meta.current_page} de {report.meta.last_page}</span><button className="button button--secondary" disabled={report.meta.current_page >= report.meta.last_page || isLoading} onClick={() => { setIsLoading(true); setError(''); setApplied((current) => ({ ...current, page: (current.page ?? 1) + 1 })) }}>Próxima</button></div>
     </section>
   )
 }

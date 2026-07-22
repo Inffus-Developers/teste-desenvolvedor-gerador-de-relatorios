@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError } from '../../services/api'
 import { getCustomer, listCustomers, type CustomerQuery } from '../../services/customers'
 import type { Customer, CustomerPage, CustomerStatus } from '../../types/customer'
@@ -21,22 +21,17 @@ export function CustomerModule() {
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
 
-  const loadCustomers = useCallback(async () => {
-    setIsLoading(true)
-    setError('')
-
-    try {
-      setPage(await listCustomers(query))
-    } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : 'Não foi possível carregar os clientes.')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [query])
-
   useEffect(() => {
-    if (view === 'list') void loadCustomers()
-  }, [loadCustomers, view])
+    if (view !== 'list') return undefined
+
+    let ignore = false
+    listCustomers(query)
+      .then((response) => { if (!ignore) setPage(response) })
+      .catch((requestError) => { if (!ignore) setError(requestError instanceof ApiError ? requestError.message : 'Não foi possível carregar os clientes.') })
+      .finally(() => { if (!ignore) setIsLoading(false) })
+
+    return () => { ignore = true }
+  }, [query, view])
 
   async function openCustomer(customer: Customer, targetView: 'detail' | 'edit') {
     setIsLoading(true)
@@ -54,10 +49,14 @@ export function CustomerModule() {
   }
 
   function handleSearch() {
+    setIsLoading(true)
+    setError('')
     setQuery((current) => ({ ...current, page: 1, search }))
   }
 
   function handleSort(sort: CustomerQuery['sort']) {
+    setIsLoading(true)
+    setError('')
     setQuery((current) => ({
       ...current,
       page: 1,
@@ -68,9 +67,10 @@ export function CustomerModule() {
 
   function returnToList(message = '') {
     setFeedback(message)
+    setIsLoading(true)
+    setError('')
     setView('list')
     setSelectedCustomer(null)
-    if (message) void loadCustomers()
   }
 
   if (view === 'create' || (view === 'edit' && selectedCustomer)) {
@@ -109,7 +109,7 @@ export function CustomerModule() {
 
       <div className="filters">
         <input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') handleSearch() }} placeholder="Buscar por nome, documento ou e-mail" aria-label="Buscar clientes" />
-        <select value={query.status ?? ''} onChange={(event) => setQuery((current) => ({ ...current, page: 1, status: event.target.value as CustomerStatus | '' }))} aria-label="Filtrar por status">
+        <select value={query.status ?? ''} onChange={(event) => { setIsLoading(true); setError(''); setQuery((current) => ({ ...current, page: 1, status: event.target.value as CustomerStatus | '' })) }} aria-label="Filtrar por status">
           <option value="">Todos os status</option>
           <option value="active">Ativos</option>
           <option value="inactive">Inativos</option>
@@ -138,9 +138,9 @@ export function CustomerModule() {
       )}
 
       <div className="pagination">
-        <button className="button button--secondary" disabled={page.meta.current_page <= 1 || isLoading} onClick={() => setQuery((current) => ({ ...current, page: (current.page ?? 1) - 1 }))}>Anterior</button>
+        <button className="button button--secondary" disabled={page.meta.current_page <= 1 || isLoading} onClick={() => { setIsLoading(true); setError(''); setQuery((current) => ({ ...current, page: (current.page ?? 1) - 1 })) }}>Anterior</button>
         <span>Página {page.meta.current_page} de {page.meta.last_page}</span>
-        <button className="button button--secondary" disabled={page.meta.current_page >= page.meta.last_page || isLoading} onClick={() => setQuery((current) => ({ ...current, page: (current.page ?? 1) + 1 }))}>Próxima</button>
+        <button className="button button--secondary" disabled={page.meta.current_page >= page.meta.last_page || isLoading} onClick={() => { setIsLoading(true); setError(''); setQuery((current) => ({ ...current, page: (current.page ?? 1) + 1 })) }}>Próxima</button>
       </div>
     </section>
   )

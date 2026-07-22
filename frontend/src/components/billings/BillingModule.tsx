@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError } from '../../services/api'
 import { getBilling, listBillings, type BillingQuery } from '../../services/billings'
 import type { Billing, BillingPage, BillingStatus } from '../../types/billing'
@@ -18,14 +18,17 @@ export function BillingModule() {
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
 
-  const load = useCallback(async () => {
-    setIsLoading(true); setError('')
-    try { setPage(await listBillings(query)) }
-    catch (requestError) { setError(requestError instanceof ApiError ? requestError.message : 'Não foi possível carregar as cobranças.') }
-    finally { setIsLoading(false) }
-  }, [query])
+  useEffect(() => {
+    if (view !== 'list') return undefined
 
-  useEffect(() => { if (view === 'list') void load() }, [load, view])
+    let ignore = false
+    listBillings(query)
+      .then((response) => { if (!ignore) setPage(response) })
+      .catch((requestError) => { if (!ignore) setError(requestError instanceof ApiError ? requestError.message : 'Não foi possível carregar as cobranças.') })
+      .finally(() => { if (!ignore) setIsLoading(false) })
+
+    return () => { ignore = true }
+  }, [query, view])
 
   async function open(billing: Billing, target: 'detail' | 'edit' | 'payment') {
     setIsLoading(true); setError('')
@@ -34,8 +37,8 @@ export function BillingModule() {
     finally { setIsLoading(false) }
   }
 
-  function back(message = '') { setFeedback(message); setSelected(null); setView('list') }
-  function searchList() { setQuery((current) => ({ ...current, page: 1, search })) }
+  function back(message = '') { setFeedback(message); setSelected(null); setIsLoading(true); setError(''); setView('list') }
+  function searchList() { setIsLoading(true); setError(''); setQuery((current) => ({ ...current, page: 1, search })) }
 
   if (view === 'create' || (view === 'edit' && selected)) return <BillingForm billing={view === 'edit' ? selected ?? undefined : undefined} onCancel={() => back()} onSaved={back} />
   if (view === 'payment' && selected) return <PaymentForm billing={selected} onCancel={() => setView('detail')} onPaid={back} />
@@ -54,9 +57,9 @@ export function BillingModule() {
     <section className="panel">
       <div className="panel__heading"><div><span className="eyebrow">Gestão</span><h2>Cobranças</h2><p>{page.meta.total} cobrança(s) encontrada(s)</p></div><button className="button" onClick={() => { setFeedback(''); setView('create') }}>Nova cobrança</button></div>
       {feedback && <div className="alert alert--success" role="status">{feedback}</div>}{error && <div className="alert alert--error" role="alert">{error}</div>}
-      <div className="filters"><input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') searchList() }} placeholder="Buscar pela descrição" aria-label="Buscar cobranças" /><select value={query.status ?? ''} onChange={(event) => setQuery((current) => ({ ...current, page: 1, status: event.target.value as BillingStatus | '' }))}><option value="">Todos os status</option><option value="pending">Pendentes</option><option value="overdue">Vencidas</option><option value="paid">Pagas</option></select><button className="button button--secondary" onClick={searchList}>Buscar</button></div>
+      <div className="filters"><input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') searchList() }} placeholder="Buscar pela descrição" aria-label="Buscar cobranças" /><select value={query.status ?? ''} onChange={(event) => { setIsLoading(true); setError(''); setQuery((current) => ({ ...current, page: 1, status: event.target.value as BillingStatus | '' })) }}><option value="">Todos os status</option><option value="pending">Pendentes</option><option value="overdue">Vencidas</option><option value="paid">Pagas</option></select><button className="button button--secondary" onClick={searchList}>Buscar</button></div>
       {isLoading ? <div className="empty-state" role="status">Carregando cobranças...</div> : page.data.length === 0 ? <div className="empty-state">Nenhuma cobrança encontrada.</div> : <div className="table-scroll"><table><thead><tr><th>Cliente</th><th>Descrição</th><th>Vencimento</th><th>Status</th><th>Original</th><th>Atualizado</th><th>Ações</th></tr></thead><tbody>{page.data.map((billing) => <tr key={billing.id}><td>{billing.customer.name}</td><td><strong>{billing.description}</strong></td><td>{date(billing.due_date)}</td><td><span className={`status status--${billing.status}`}>{statusLabel(billing.status)}</span></td><td>{money(billing.original_amount)}</td><td>{money(billing.updated_amount)}</td><td><div className="table-actions"><button onClick={() => void open(billing, 'detail')}>Ver</button>{billing.status !== 'paid' && <><button onClick={() => void open(billing, 'edit')}>Editar</button><button onClick={() => void open(billing, 'payment')}>Pagar</button></>}</div></td></tr>)}</tbody></table></div>}
-      <div className="pagination"><button className="button button--secondary" disabled={page.meta.current_page <= 1 || isLoading} onClick={() => setQuery((current) => ({ ...current, page: (current.page ?? 1) - 1 }))}>Anterior</button><span>Página {page.meta.current_page} de {page.meta.last_page}</span><button className="button button--secondary" disabled={page.meta.current_page >= page.meta.last_page || isLoading} onClick={() => setQuery((current) => ({ ...current, page: (current.page ?? 1) + 1 }))}>Próxima</button></div>
+      <div className="pagination"><button className="button button--secondary" disabled={page.meta.current_page <= 1 || isLoading} onClick={() => { setIsLoading(true); setError(''); setQuery((current) => ({ ...current, page: (current.page ?? 1) - 1 })) }}>Anterior</button><span>Página {page.meta.current_page} de {page.meta.last_page}</span><button className="button button--secondary" disabled={page.meta.current_page >= page.meta.last_page || isLoading} onClick={() => { setIsLoading(true); setError(''); setQuery((current) => ({ ...current, page: (current.page ?? 1) + 1 })) }}>Próxima</button></div>
     </section>
   )
 }

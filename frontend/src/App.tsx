@@ -8,7 +8,7 @@ import { BillingReportModule } from './components/reports/BillingReportModule'
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
-  const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const [isCheckingSession, setIsCheckingSession] = useState(() => Boolean(sessionStorage.getItem('auth_token')))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -19,10 +19,7 @@ function App() {
   useEffect(() => {
     const token = sessionStorage.getItem('auth_token')
 
-    if (!token) {
-      setIsCheckingSession(false)
-      return
-    }
+    if (!token) return
 
     getAuthenticatedUser()
       .then(({ user: authenticatedUser }) => setUser(authenticatedUser))
