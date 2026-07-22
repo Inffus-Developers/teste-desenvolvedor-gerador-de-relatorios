@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BillingController;
 use App\Http\Controllers\Api\BillingReportController;
+use App\Http\Controllers\Api\BillingReportCsvController;
 use App\Http\Controllers\Api\CustomerController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,4 +18,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('billings/{billing}/payment', [BillingController::class, 'pay']);
     Route::apiResource('billings', BillingController::class)->except('destroy');
     Route::get('reports/billings', BillingReportController::class);
+    Route::get('reports/billings/export/csv', BillingReportCsvController::class);
 });

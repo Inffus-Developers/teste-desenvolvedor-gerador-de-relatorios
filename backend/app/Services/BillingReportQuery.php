@@ -33,6 +33,14 @@ class BillingReportQuery
             });
     }
 
+    /** @param array<string, mixed> $filters */
+    public function orderedRows(array $filters): Builder
+    {
+        return $this->rows($filters)
+            ->orderBy($filters['sort'] ?? 'due_date', $filters['direction'] ?? 'desc')
+            ->orderBy('id', 'desc');
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      * @return array{count: int, original_total: float, interest_total: float, updated_total: float, received_total: float, pending_total: float}

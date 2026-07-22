@@ -13,9 +13,7 @@ class BillingReportController extends Controller
     public function __invoke(BillingReportRequest $request, BillingReportQuery $report): AnonymousResourceCollection
     {
         $filters = $request->validated();
-        $rows = $report->rows($filters)
-            ->orderBy($filters['sort'] ?? 'due_date', $filters['direction'] ?? 'desc')
-            ->orderBy('id', 'desc')
+        $rows = $report->orderedRows($filters)
             ->paginate($filters['per_page'] ?? 25)
             ->withQueryString();
 
