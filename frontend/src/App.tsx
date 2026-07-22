@@ -4,6 +4,7 @@ import { ApiError } from './services/api'
 import type { User } from './types/auth'
 import { CustomerModule } from './components/customers/CustomerModule'
 import { BillingModule } from './components/billings/BillingModule'
+import { BillingReportModule } from './components/reports/BillingReportModule'
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -13,7 +14,7 @@ function App() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
-  const [activeModule, setActiveModule] = useState<'customers' | 'billings'>('customers')
+  const [activeModule, setActiveModule] = useState<'customers' | 'billings' | 'reports'>('customers')
 
   useEffect(() => {
     const token = sessionStorage.getItem('auth_token')
@@ -93,9 +94,12 @@ function App() {
         <nav className="module-nav" aria-label="Módulos do sistema">
           <button className={activeModule === 'customers' ? 'is-active' : ''} onClick={() => setActiveModule('customers')}>Clientes</button>
           <button className={activeModule === 'billings' ? 'is-active' : ''} onClick={() => setActiveModule('billings')}>Cobranças</button>
+          <button className={activeModule === 'reports' ? 'is-active' : ''} onClick={() => setActiveModule('reports')}>Relatórios</button>
         </nav>
         {feedback && <div className="alert alert--success page-feedback" role="status">{feedback}</div>}
-        {activeModule === 'customers' ? <CustomerModule /> : <BillingModule />}
+        {activeModule === 'customers' && <CustomerModule />}
+        {activeModule === 'billings' && <BillingModule />}
+        {activeModule === 'reports' && <BillingReportModule />}
       </main>
     )
   }

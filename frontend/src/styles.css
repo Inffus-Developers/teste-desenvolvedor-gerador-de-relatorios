@@ -95,6 +95,15 @@ th { color: #657187; font-size: .75rem; letter-spacing: .06em; text-transform: u
 .module-nav button { border: 0; border-radius: .6rem; padding: .7rem 1rem; color: #657187; background: transparent; font-weight: 800; }
 .module-nav button.is-active { color: #087f8c; background: #fff; box-shadow: 0 .2rem .8rem rgb(31 49 69 / 10%); }
 .page-feedback { max-width: 72rem; margin: 0 auto; }
+.report-panel { max-width: 92rem; }
+.report-filters { display: grid; grid-template-columns: repeat(5, minmax(9rem, 1fr)) auto; gap: .8rem; align-items: end; margin-bottom: 1.5rem; padding: 1rem; border-radius: .9rem; background: #f7f9fb; }
+.report-filter-button { min-height: 2.8rem; }
+.totals-grid { display: grid; grid-template-columns: repeat(6, minmax(9rem, 1fr)); gap: .8rem; margin: 1.5rem 0; }
+.total-card { display: grid; gap: .45rem; padding: 1rem; border: 1px solid #e1e7ee; border-radius: .8rem; background: #fff; }
+.total-card span { color: #657187; font-size: .75rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.total-card strong { font-size: 1.15rem; }
+.total-card--positive { border-color: #bfe7cf; background: #f2fbf6; }
+.total-card--warning { border-color: #f1d98b; background: #fffbeb; }
 
 @media (max-width: 800px) {
   .auth-layout { grid-template-columns: 1fr; align-content: center; }
@@ -104,4 +113,10 @@ th { color: #657187; font-size: .75rem; letter-spacing: .06em; text-transform: u
   .filters, .entity-form, .detail-grid { grid-template-columns: 1fr; }
   .field--wide { grid-column: auto; }
   .form-actions { grid-column: auto; }
+  .report-filters, .totals-grid { grid-template-columns: 1fr; }
+}
+
+@media (min-width: 801px) and (max-width: 1200px) {
+  .report-filters { grid-template-columns: repeat(3, 1fr); }
+  .totals-grid { grid-template-columns: repeat(3, 1fr); }
 }
