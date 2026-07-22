@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { getAuthenticatedUser, login, logout } from './services/auth'
 import { ApiError } from './services/api'
 import type { User } from './types/auth'
+import { CustomerModule } from './components/customers/CustomerModule'
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -89,11 +90,7 @@ function App() {
 
         {feedback && <div className="alert alert--success" role="status">{feedback}</div>}
 
-        <section className="dashboard-card">
-          <span className="eyebrow">Área protegida</span>
-          <h2>Ambiente autenticado</h2>
-          <p>Os módulos de clientes, cobranças e relatórios serão disponibilizados nas próximas etapas.</p>
-        </section>
+        <CustomerModule />
       </main>
     )
   }
