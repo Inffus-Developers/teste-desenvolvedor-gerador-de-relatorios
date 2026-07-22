@@ -437,7 +437,7 @@ Não é necessário implementar funcionalidades além das solicitadas. O foco de
 
 ### Estado atual
 
-Etapa 4 — cobranças: autenticação, clientes, cobranças, cálculo de juros e registro de pagamentos disponíveis pela API e pelo React.
+Etapa 5 — relatórios: relatório de faturamento paginado com filtros, ordenação e totalizadores calculados no banco de dados.
 
 ### Como executar
 
@@ -610,4 +610,56 @@ Para executar somente os testes desta etapa:
 
 ```bash
 docker compose exec backend php artisan test --filter=BillingApiTest
+```
+
+### Relatório de faturamento
+
+No menu **Relatórios**, selecione a data inicial, data final e a base do período:
+
+* data de emissão;
+* data de vencimento;
+* data de pagamento.
+
+Também é possível filtrar por cliente e status (`pending`, `overdue` ou `paid`). A tabela exibe cliente, descrição, emissão, vencimento, status, valor original, juros, valor atualizado e valor pago.
+
+O endpoint protegido é:
+
+```text
+GET /api/reports/billings
+```
+
+Parâmetros obrigatórios:
+
+* `date_from`;
+* `date_to`;
+* `period_basis`: `issue_date`, `due_date` ou `payment_date`.
+
+Parâmetros opcionais:
+
+* `customer_id`;
+* `status`;
+* `sort` e `direction`;
+* `page` e `per_page`, limitado a 100 registros por página.
+
+Os totalizadores retornados são quantidade de cobranças, valor original total, total de juros, valor atualizado total, valor recebido e valor pendente.
+
+#### Estratégia de consulta e performance
+
+Os filtros e a ordenação são aplicados pelo MySQL antes da paginação. A consulta das linhas usa eager loading do cliente com seleção apenas de `id` e `name`, evitando N+1. Somente a página solicitada é materializada pela aplicação.
+
+Os seis totalizadores são calculados em uma única consulta de agregação no banco. A fórmula dos juros compõe uma subconsulta SQL, portanto nenhuma coleção completa de cobranças é carregada em PHP. Para cobranças pagas, a agregação usa os juros congelados em `interest_paid`; para pendentes vencidas, usa `POWER` e `DATEDIFF` do MySQL com a data atual.
+
+Os índices definidos na tabela de cobranças atendem aos principais caminhos do relatório:
+
+* `(status, due_date)` para status e vencimento;
+* `(customer_id, issue_date)` para cliente e emissão;
+* `payment_date` para períodos de recebimento;
+* `created_at` para ordenação administrativa.
+
+Com milhões de registros, o banco continua filtrando, ordenando e agregando sem transferir todas as linhas para a aplicação. Páginas muito profundas e agregações sobre períodos excessivamente amplos ainda podem ser custosas. Em produção, as próximas otimizações seriam paginação por cursor para navegação sequencial, réplica de leitura, cache de totalizadores por conjunto de filtros, tabelas de resumo por dia/cliente e processamento assíncrono de períodos muito grandes.
+
+Para executar os testes do relatório:
+
+```bash
+docker compose exec backend php artisan test --filter=BillingReportTest
 ```
