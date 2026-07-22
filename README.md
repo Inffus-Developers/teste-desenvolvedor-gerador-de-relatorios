@@ -437,7 +437,7 @@ Não é necessário implementar funcionalidades além das solicitadas. O foco de
 
 ### Estado atual
 
-Etapa 2 — autenticação: fundação Dockerizada, API protegida com Laravel Sanctum e fluxo de login/logout no React.
+Etapa 3 — clientes: fundação Dockerizada, autenticação completa e gestão de clientes pela API e pelo React.
 
 ### Como executar
 
@@ -528,3 +528,40 @@ Para executar os testes de autenticação:
 ```bash
 docker compose exec backend php artisan test --filter=AuthenticationTest
 ```
+
+### Gestão de clientes
+
+Após o login, a tela inicial exibe o módulo de clientes. O usuário pode:
+
+* listar clientes com paginação no backend;
+* buscar por nome, documento ou e-mail;
+* filtrar por status ativo ou inativo;
+* ordenar por nome, documento, e-mail ou status;
+* cadastrar, visualizar e editar clientes.
+
+Os campos nome, documento, e-mail e status são obrigatórios. Documento e e-mail devem ser únicos.
+
+Endpoints protegidos disponíveis:
+
+| Método | Endpoint | Finalidade |
+| --- | --- | --- |
+| `GET` | `/api/customers` | Listar, filtrar, ordenar e paginar |
+| `POST` | `/api/customers` | Cadastrar cliente |
+| `GET` | `/api/customers/{id}` | Visualizar cliente |
+| `PUT/PATCH` | `/api/customers/{id}` | Editar cliente |
+
+Parâmetros aceitos na listagem:
+
+* `page` e `per_page` — página e quantidade, limitada a 100 registros;
+* `search` — busca em nome, documento e e-mail;
+* `status` — `active` ou `inactive`;
+* `sort` — `name`, `document`, `email`, `status` ou `created_at`;
+* `direction` — `asc` ou `desc`.
+
+Para executar somente os testes de clientes:
+
+```bash
+docker compose exec backend php artisan test --filter=CustomerApiTest
+```
+
+A tabela `customers` possui índices únicos em documento e e-mail, índice em nome e índice composto em status/nome. Eles atendem à identificação única, à ordenação padrão por nome e à listagem frequente por status seguida de nome.
