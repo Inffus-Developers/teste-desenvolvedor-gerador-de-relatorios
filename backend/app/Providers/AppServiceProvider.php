@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +20,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            DB::connection()->getPdo()->sqliteCreateFunction(
+                'POWER',
+                fn (float $base, float $exponent): float => $base ** $exponent,
+                2,
+            );
+        }
     }
 }
