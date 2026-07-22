@@ -24,6 +24,7 @@ export function BillingReportModule() {
   const [applied, setApplied] = useState<ReportFilters>(initialFilters)
   const [report, setReport] = useState<BillingReport>(emptyReport)
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [customerSearch, setCustomerSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isExporting, setIsExporting] = useState<'csv' | 'pdf' | null>(null)
@@ -52,6 +53,16 @@ export function BillingReportModule() {
     setApplied((current) => ({ ...current, page: 1, sort, direction: current.sort === sort && current.direction === 'asc' ? 'desc' : 'asc' }))
   }
 
+  async function searchCustomers() {
+    setError('')
+    try {
+      const response = await listCustomers({ per_page: 100, sort: 'name', search: customerSearch || undefined })
+      setCustomers(response.data)
+    } catch {
+      setError('Não foi possível buscar os clientes.')
+    }
+  }
+
   async function download(format: 'csv' | 'pdf') {
     setIsExporting(format)
     setError('')
@@ -78,7 +89,7 @@ export function BillingReportModule() {
         <label className="field">Data inicial<input type="date" value={draft.date_from} onChange={(event) => setDraft((current) => ({ ...current, date_from: event.target.value }))} required /></label>
         <label className="field">Data final<input type="date" value={draft.date_to} onChange={(event) => setDraft((current) => ({ ...current, date_to: event.target.value }))} required /></label>
         <label className="field">Período baseado em<select value={draft.period_basis} onChange={(event) => setDraft((current) => ({ ...current, period_basis: event.target.value as PeriodBasis }))}><option value="issue_date">Data de emissão</option><option value="due_date">Data de vencimento</option><option value="payment_date">Data de pagamento</option></select></label>
-        <label className="field">Cliente<select value={draft.customer_id ?? ''} onChange={(event) => setDraft((current) => ({ ...current, customer_id: event.target.value ? Number(event.target.value) : undefined }))}><option value="">Todos os clientes</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
+        <label className="field field--wide">Cliente<span className="customer-picker"><input value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchCustomers() } }} placeholder="Buscar cliente" aria-label="Buscar cliente no relatório" /><button className="button button--secondary" type="button" onClick={() => void searchCustomers()}>Buscar clientes</button></span><select value={draft.customer_id ?? ''} onChange={(event) => setDraft((current) => ({ ...current, customer_id: event.target.value ? Number(event.target.value) : undefined }))}><option value="">Todos os clientes</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
         <label className="field">Status<select value={draft.status ?? ''} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as BillingStatus | '' }))}><option value="">Todos os status</option><option value="pending">Pendente</option><option value="overdue">Vencida</option><option value="paid">Paga</option></select></label>
         <button className="button report-filter-button" type="submit" disabled={isLoading}>{isLoading ? 'Carregando...' : 'Aplicar filtros'}</button>
       </form>

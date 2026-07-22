@@ -27,12 +27,13 @@ export function BillingForm({ billing, onCancel, onSaved }: Props) {
     status: 'pending',
   } : emptyBilling())
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [customerSearch, setCustomerSearch] = useState('')
   const [errors, setErrors] = useState<Record<string, string[]>>({})
   const [generalError, setGeneralError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    listCustomers({ per_page: 100, sort: 'name' })
+    listCustomers({ per_page: 100, sort: 'name', status: 'active' })
       .then((response) => setCustomers(response.data))
       .catch(() => setGeneralError('Não foi possível carregar os clientes ativos.'))
   }, [])
@@ -40,6 +41,16 @@ export function BillingForm({ billing, onCancel, onSaved }: Props) {
   function updateField<Key extends keyof BillingPayload>(key: Key, value: BillingPayload[Key]) {
     setForm((current) => ({ ...current, [key]: value }))
     setErrors((current) => ({ ...current, [key]: [] }))
+  }
+
+  async function searchCustomers() {
+    setGeneralError('')
+    try {
+      const response = await listCustomers({ per_page: 100, sort: 'name', status: 'active', search: customerSearch || undefined })
+      setCustomers(response.data)
+    } catch {
+      setGeneralError('Não foi possível buscar os clientes ativos.')
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -68,6 +79,10 @@ export function BillingForm({ billing, onCancel, onSaved }: Props) {
       {generalError && <div className="alert alert--error" role="alert">{generalError}</div>}
       <form className="entity-form" onSubmit={handleSubmit}>
         <label className="field field--wide">Cliente
+          <span className="customer-picker">
+            <input value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchCustomers() } }} placeholder="Buscar por nome, documento ou e-mail" aria-label="Buscar cliente para cobrança" />
+            <button className="button button--secondary" type="button" onClick={() => void searchCustomers()}>Buscar clientes</button>
+          </span>
           <select value={form.customer_id} onChange={(event) => updateField('customer_id', Number(event.target.value))} required>
             <option value={0}>Selecione um cliente</option>
             {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
