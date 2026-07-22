@@ -318,6 +318,8 @@ Também será avaliada a forma como o candidato utiliza e configura agentes de I
 
 Boas práticas no uso serão consideradas de forma positiva.
 
+Neste desenvolvimento foi utilizado o Codex como assistente para implementação, validação e organização do fluxo Git. As orientações persistentes fornecidas aos agentes estão registradas em [`AGENTS.md`](AGENTS.md). Todas as alterações foram revisadas e validadas localmente antes da integração, e nenhum segredo ou credencial pessoal foi incluído no repositório.
+
 ---
 
 ## Organização dos commits
