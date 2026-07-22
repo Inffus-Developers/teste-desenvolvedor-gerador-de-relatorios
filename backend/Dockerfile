@@ -1,7 +1,7 @@
 FROM php:8.3-cli-alpine
 
-RUN apk add --no-cache icu-dev libzip-dev mysql-client unzip \
-    && docker-php-ext-install intl pdo_mysql zip
+RUN apk add --no-cache icu-dev libzip-dev mysql-client sqlite-dev unzip \
+    && docker-php-ext-install intl pdo_mysql pdo_sqlite zip
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
