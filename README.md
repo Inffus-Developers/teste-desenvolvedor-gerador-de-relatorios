@@ -437,7 +437,7 @@ Não é necessário implementar funcionalidades além das solicitadas. O foco de
 
 ### Estado atual
 
-Etapa 6 — exportações: relatório paginado e exportações CSV/PDF com os mesmos filtros e totalizadores.
+Etapa 7 — performance: geração configurável de dados em lotes, índices por base de período e testes isolados do banco local.
 
 ### Como executar
 
@@ -691,4 +691,61 @@ Para executar os testes das exportações:
 
 ```bash
 docker compose exec backend php artisan test --filter=BillingReportExportTest
+```
+
+### Dados para testes de performance
+
+O comando abaixo gera, por padrão, 1.000 clientes e 100.000 cobranças usando as factories do projeto:
+
+```bash
+docker compose exec backend php artisan app:generate-performance-data
+```
+
+As quantidades e o tamanho dos blocos podem ser informados em cada execução:
+
+```bash
+docker compose exec backend php artisan app:generate-performance-data \
+  --customers=1000 \
+  --billings=10000 \
+  --chunk=1000
+```
+
+No Windows PowerShell, o mesmo comando pode ser escrito em uma única linha. Também é possível alterar os padrões no `.env` da raiz:
+
+```dotenv
+PERFORMANCE_CUSTOMERS=1000
+PERFORMANCE_BILLINGS=100000
+PERFORMANCE_CHUNK_SIZE=1000
+```
+
+O comando é aditivo: cada execução cria um novo conjunto de clientes e cobranças, sem apagar dados existentes. Aproximadamente um terço das cobranças geradas fica pago e o restante pendente, permitindo testar diferentes filtros e totalizadores. Em produção, há confirmação interativa; a opção `--force` deve ser usada apenas de forma deliberada.
+
+O `PerformanceDataSeeder` oferece a mesma geração com os valores do ambiente:
+
+```bash
+docker compose exec backend php artisan db:seed --class=PerformanceDataSeeder
+```
+
+#### Estratégia de geração
+
+Clientes e cobranças são materializados e inseridos em lotes configuráveis. A aplicação mantém em memória somente o lote atual de modelos e a lista de identificadores dos clientes gerados, evitando acumular todas as cobranças. Inserções em bloco também reduzem viagens ao banco em comparação com um `INSERT` por modelo.
+
+Como referência local, a geração de 1.000 clientes e 10.000 cobranças em blocos de 1.000 levou aproximadamente 5 segundos. Esse valor é apenas indicativo e varia conforme CPU, disco e recursos destinados ao Docker.
+
+#### Índices e consultas em grande volume
+
+Além dos índices compostos `(status, due_date)` e `(customer_id, issue_date)`, a tabela `billings` possui índices individuais em `issue_date`, `due_date` e `payment_date`. Os índices individuais são necessários quando o relatório filtra somente pelo período, sem cliente ou status; os compostos atendem aos filtros combinados mais frequentes.
+
+Os planos `EXPLAIN` foram conferidos no MySQL com 10.000 cobranças. Consultas por emissão e vencimento selecionaram, respectivamente, `billings_issue_date_index` e `billings_due_date_index`, com varredura por intervalo em vez de leitura integral da tabela.
+
+Com milhões de registros, a paginação, os filtros, a ordenação e os totalizadores permanecem no banco. Para produção em escala maior, as evoluções recomendadas são paginação por cursor para páginas profundas, réplicas de leitura, tabelas de resumo, cache de agregações, particionamento por data após análise da distribuição real e geração assíncrona de exportações.
+
+#### Isolamento dos testes
+
+A suíte automatizada usa SQLite em memória. Dessa forma, `php artisan test` não recria nem altera o banco MySQL utilizado pela interface. A imagem Docker inclui `pdo_sqlite` exclusivamente para essa execução isolada.
+
+Para executar somente os testes do gerador e dos índices:
+
+```bash
+docker compose exec backend php artisan test --filter=GeneratePerformanceDataTest
 ```
