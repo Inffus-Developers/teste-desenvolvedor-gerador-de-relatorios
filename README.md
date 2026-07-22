@@ -430,3 +430,60 @@ Prazo de entrega sugerido: até 5 dias corridos.
 O teste foi planejado para exigir aproximadamente 8 a 12 horas de desenvolvimento.
 
 Não é necessário implementar funcionalidades além das solicitadas. O foco deve estar na qualidade da solução, nas decisões técnicas e na clareza da implementação.
+
+---
+
+## Implementação
+
+### Estado atual
+
+Etapa 1 — fundação do projeto: Laravel 12, React com TypeScript, MySQL 8.4 e Docker Compose.
+
+### Como executar
+
+Requisitos: Docker Desktop com Docker Compose.
+
+1. Copie as variáveis de ambiente da raiz:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   No Windows PowerShell, use `Copy-Item .env.example .env`.
+
+2. Construa e inicie todos os serviços:
+
+   ```bash
+   docker compose up --build
+   ```
+
+3. Acesse:
+
+   * Frontend: http://localhost:5173
+   * API/backend: http://localhost:8000
+
+O backend aguarda o MySQL ficar saudável, instala dependências quando necessário e executa as migrations automaticamente. Os dados do MySQL ficam persistidos no volume `mysql_data`.
+
+Para encerrar os serviços:
+
+```bash
+docker compose down
+```
+
+O comando acima preserva os dados. Para remover os volumes deliberadamente, use `docker compose down --volumes`.
+
+### Como validar a fundação
+
+```bash
+docker compose config
+docker compose exec backend php artisan test
+docker compose exec frontend npm run build
+```
+
+### Estrutura
+
+* `backend/`: API Laravel e testes automatizados.
+* `frontend/`: aplicação React/TypeScript com Vite.
+* `docker-compose.yml`: orquestra backend, frontend e MySQL.
+
+As instruções serão ampliadas ao final de cada etapa funcional.
