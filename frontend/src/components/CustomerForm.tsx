@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Field, Form, Loading, SelectField } from "@/components/ui";
+import { Alert, Field, Form, Loading, PageTitle, SelectField } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { ApiError, Customer } from "@/types/api";
 
@@ -74,14 +74,14 @@ export function CustomerForm({ mode, customerId }: Props) {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">
-          {mode === "create" ? "Novo cliente" : "Editar cliente"}
-        </h1>
-        <Link href="/customers" className="btn-secondary">
-          Voltar
-        </Link>
-      </div>
+      <PageTitle
+        title={mode === "create" ? "Novo cliente" : "Editar cliente"}
+        action={
+          <Link href="/customers" className="btn-secondary">
+            Voltar
+          </Link>
+        }
+      />
       <Alert error={error} success={success} />
       <Form onSubmit={onSubmit} className="grid max-w-2xl gap-4">
         <Field label="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />

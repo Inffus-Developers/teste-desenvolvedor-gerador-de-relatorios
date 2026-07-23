@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Alert, Loading, PageTitle } from "@/components/ui";
+import { Alert, DetailCard, DetailRow, Loading, PageTitle } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { ApiError, Customer } from "@/types/api";
 
@@ -43,17 +43,11 @@ export default function CustomerShowPage() {
         }
       />
       <Alert error={error} />
-      <div className="grid max-w-2xl gap-3 rounded-lg border border-slate-200 bg-white p-5 text-sm">
-        <div>
-          <span className="text-slate-500">Documento:</span> {customer.document}
-        </div>
-        <div>
-          <span className="text-slate-500">E-mail:</span> {customer.email}
-        </div>
-        <div>
-          <span className="text-slate-500">Status:</span> {customer.status === "active" ? "Ativo" : "Inativo"}
-        </div>
-      </div>
+      <DetailCard>
+        <DetailRow label="Documento">{customer.document}</DetailRow>
+        <DetailRow label="E-mail">{customer.email}</DetailRow>
+        <DetailRow label="Status">{customer.status === "active" ? "Ativo" : "Inativo"}</DetailRow>
+      </DetailCard>
     </div>
   );
 }

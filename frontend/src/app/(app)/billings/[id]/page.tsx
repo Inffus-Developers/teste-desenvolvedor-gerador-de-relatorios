@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Alert, Field, Form, Loading, PageTitle } from "@/components/ui";
+import { Alert, DetailCard, DetailRow, Field, Form, Loading, PageTitle, SectionTitle } from "@/components/ui";
 import { api, money, percent } from "@/lib/api";
 import type { ApiError, Billing } from "@/types/api";
 
@@ -84,52 +84,40 @@ export default function BillingShowPage() {
         }
       />
       <Alert error={error} success={success} />
-      <div className="grid max-w-3xl gap-3 rounded-lg border border-slate-200 bg-white p-5 text-sm">
-        <div>
-          <span className="text-slate-500">Cliente:</span> {billing.customer?.name ?? billing.customer_id}
-        </div>
-        <div>
-          <span className="text-slate-500">Descrição:</span> {billing.description}
-        </div>
-        <div>
-          <span className="text-slate-500">Emissão:</span> {billing.issue_date}
-        </div>
-        <div>
-          <span className="text-slate-500">Vencimento:</span> {billing.due_date}
-        </div>
-        <div>
-          <span className="text-slate-500">Status:</span> {statusLabel[billing.status] ?? billing.status}
-        </div>
-        <div>
-          <span className="text-slate-500">Valor original:</span> {money(billing.original_amount)}
-        </div>
-        <div>
-          <span className="text-slate-500">Juros:</span> {money(billing.interest_amount)}
-        </div>
-        <div>
-          <span className="text-slate-500">Valor atualizado:</span> {money(billing.updated_amount)}
-        </div>
-        <div>
-          <span className="text-slate-500">Taxa mensal:</span> {percent(billing.monthly_interest_rate)}
-        </div>
+      <DetailCard className="max-w-3xl">
+        <DetailRow label="Cliente">{billing.customer?.name ?? billing.customer_id}</DetailRow>
+        <DetailRow label="Descrição">{billing.description}</DetailRow>
+        <DetailRow label="Emissão">{billing.issue_date}</DetailRow>
+        <DetailRow label="Vencimento">{billing.due_date}</DetailRow>
+        <DetailRow label="Status">{statusLabel[billing.status] ?? billing.status}</DetailRow>
+        <DetailRow label="Valor original">
+          <span className="tabular-nums">{money(billing.original_amount)}</span>
+        </DetailRow>
+        <DetailRow label="Juros">
+          <span className="tabular-nums">{money(billing.interest_amount)}</span>
+        </DetailRow>
+        <DetailRow label="Valor atualizado">
+          <span className="tabular-nums">{money(billing.updated_amount)}</span>
+        </DetailRow>
+        <DetailRow label="Taxa mensal">
+          <span className="tabular-nums">{percent(billing.monthly_interest_rate)}</span>
+        </DetailRow>
         {billing.payment_date && (
           <>
-            <div>
-              <span className="text-slate-500">Data do pagamento:</span> {billing.payment_date}
-            </div>
-            <div>
-              <span className="text-slate-500">Valor pago:</span> {money(billing.paid_amount)}
-            </div>
-            <div>
-              <span className="text-slate-500">Juros no pagamento:</span> {money(billing.interest_amount_at_payment)}
-            </div>
+            <DetailRow label="Data do pagamento">{billing.payment_date}</DetailRow>
+            <DetailRow label="Valor pago">
+              <span className="tabular-nums">{money(billing.paid_amount)}</span>
+            </DetailRow>
+            <DetailRow label="Juros no pagamento">
+              <span className="tabular-nums">{money(billing.interest_amount_at_payment)}</span>
+            </DetailRow>
           </>
         )}
-      </div>
+      </DetailCard>
 
       {canPay && (
-        <Form onSubmit={onPay} className="mt-6 grid max-w-md gap-4">
-          <h2 className="text-lg font-semibold text-slate-900">Registrar pagamento</h2>
+        <Form onSubmit={onPay} className="mt-6 max-w-md">
+          <SectionTitle>Registrar pagamento</SectionTitle>
           <Field
             label="Data do pagamento"
             type="date"

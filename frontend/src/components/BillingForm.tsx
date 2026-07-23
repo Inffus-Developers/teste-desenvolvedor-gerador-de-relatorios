@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Field, Form, Loading, SelectField } from "@/components/ui";
+import { Alert, Field, Form, Loading, PageTitle, SelectField } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { ApiError, Billing, Customer, PaginatedResponse } from "@/types/api";
 
@@ -92,14 +92,14 @@ export function BillingForm({ mode, billingId }: Props) {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">
-          {mode === "create" ? "Nova cobrança" : "Editar cobrança"}
-        </h1>
-        <Link href="/billings" className="btn-secondary">
-          Voltar
-        </Link>
-      </div>
+      <PageTitle
+        title={mode === "create" ? "Nova cobrança" : "Editar cobrança"}
+        action={
+          <Link href="/billings" className="btn-secondary">
+            Voltar
+          </Link>
+        }
+      />
       <Alert error={error} success={success} />
       <Form onSubmit={onSubmit} className="grid max-w-2xl gap-4">
         <SelectField

@@ -38,7 +38,7 @@ export function ProtectedShell({ children }: { children: ReactNode }) {
           <Link href="/customers" className="app-brand">
             Inffus Billing
           </Link>
-          <nav className="flex items-center gap-1">
+          <nav className="hidden items-center gap-1 sm:flex">
             {links.map(([href, label]) => (
               <Link
                 key={href}
@@ -52,6 +52,24 @@ export function ProtectedShell({ children }: { children: ReactNode }) {
               Sair
             </button>
           </nav>
+          <div className="flex items-center gap-2 sm:hidden">
+            {links.map(([href, label]) => (
+              <Link
+                key={href}
+                href={href}
+                className={`rounded-full px-2.5 py-1.5 text-xs font-medium ${
+                  pathname.startsWith(href)
+                    ? "bg-[rgb(83_58_253/0.1)] text-[var(--color-primary-deep)]"
+                    : "text-muted"
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+            <button type="button" onClick={logout} className="btn-ghost px-2 py-1.5 text-xs">
+              Sair
+            </button>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6">{children}</main>
@@ -182,4 +200,29 @@ export function StatCard({ label, value, tabular = false }: { label: string; val
       <div className={`stat-card-value ${tabular ? "tabular-nums" : ""}`}>{value}</div>
     </div>
   );
+}
+
+export function DetailCard({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`surface-card grid gap-3 p-5 text-sm ${className ?? "max-w-2xl"}`}>{children}</div>
+  );
+}
+
+export function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap gap-x-2">
+      <span className="text-muted">{label}:</span>
+      <span className="text-secondary">{children}</span>
+    </div>
+  );
+}
+
+export function SectionTitle({ children }: { children: ReactNode }) {
+  return <h2 className="text-base font-semibold tracking-tight text-[var(--color-ink)]">{children}</h2>;
 }
