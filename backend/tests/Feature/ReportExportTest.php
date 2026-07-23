@@ -83,7 +83,11 @@ class ReportExportTest extends TestCase
     public function test_processor_generates_csv_file(): void
     {
         Storage::fake('local');
-        Billing::factory()->for(Customer::factory())->create();
+        $customer = Customer::factory()->create(['name' => 'Async Customer']);
+        Billing::factory()->for($customer)->create([
+            'description' => 'Queued export row',
+            'original_amount' => 300,
+        ]);
 
         $export = ReportExport::create([
             'user_id' => User::factory()->create()->id,
@@ -98,6 +102,12 @@ class ReportExportTest extends TestCase
         $this->assertSame('completed', $export->status);
         $this->assertSame(1, $export->row_count);
         Storage::disk('local')->assertExists($export->file_path);
+
+        $csv = Storage::disk('local')->get($export->file_path);
+        $this->assertStringContainsString('Billing report', $csv);
+        $this->assertStringContainsString('Async Customer', $csv);
+        $this->assertStringContainsString('Queued export row', $csv);
+        $this->assertStringContainsString('300.00', $csv);
     }
 
     public function test_completed_export_can_be_downloaded(): void

@@ -79,6 +79,28 @@ class BillingApiTest extends TestCase
             ->assertJsonPath('totals.pending_total', '100.00');
     }
 
+    public function test_report_totals_include_overdue_interest(): void
+    {
+        Carbon::setTestNow('2026-07-22');
+        Billing::factory()->for(Customer::factory())->create([
+            'original_amount' => 1000,
+            'monthly_interest_rate' => 0.02,
+            'issue_date' => '2026-06-01',
+            'due_date' => '2026-06-22',
+        ]);
+
+        $response = $this->actingAs(User::factory()->create(), 'sanctum')
+            ->getJson('/api/reports/billing');
+
+        $response->assertOk()
+            ->assertJsonPath('totals.count', 1)
+            ->assertJsonPath('totals.original_total', '1000.00')
+            ->assertJsonPath('totals.interest_total', '20.00')
+            ->assertJsonPath('totals.updated_total', '1020.00')
+            ->assertJsonPath('totals.pending_total', '1020.00')
+            ->assertJsonPath('totals.received_total', '0.00');
+    }
+
     public function test_payment_registration_persists_calculated_amount(): void
     {
         Carbon::setTestNow('2026-07-22');
@@ -97,11 +119,26 @@ class BillingApiTest extends TestCase
 
     public function test_csv_and_pdf_exports(): void
     {
-        Billing::factory()->for(Customer::factory())->create();
+        Carbon::setTestNow('2026-07-22');
+        $customer = Customer::factory()->create(['name' => 'Export Customer']);
+        Billing::factory()->for($customer)->create([
+            'description' => 'Exportable billing',
+            'original_amount' => 150,
+            'monthly_interest_rate' => 0,
+            'issue_date' => '2026-07-01',
+            'due_date' => '2026-08-01',
+        ]);
         $user = User::factory()->create();
 
-        $this->actingAs($user, 'sanctum')->get('/api/reports/billing/export/csv')
-            ->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $csv = $this->actingAs($user, 'sanctum')->get('/api/reports/billing/export/csv');
+        $csv->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+        $content = $csv->streamedContent();
+        $this->assertStringContainsString('Export Customer', $content);
+        $this->assertStringContainsString('Exportable billing', $content);
+        $this->assertStringContainsString('150.00', $content);
+        $this->assertStringContainsString('Original total', $content);
+
         $this->actingAs($user, 'sanctum')->get('/api/reports/billing/export/pdf')
             ->assertOk()->assertHeader('content-type', 'application/pdf');
     }
