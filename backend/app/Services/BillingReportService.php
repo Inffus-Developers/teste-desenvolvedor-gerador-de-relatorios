@@ -43,25 +43,7 @@ class BillingReportService
 
     public function totals(Builder $query): array
     {
-        $totals = ['count' => 0, 'original_total' => 0.0, 'interest_total' => 0.0, 'updated_total' => 0.0, 'received_total' => 0.0, 'pending_total' => 0.0];
-
-        $query->clone()->cursor()->each(function (Billing $billing) use (&$totals): void {
-            $status = $billing->derivedStatus();
-            $updated = $billing->currentUpdatedAmount();
-            $interest = $billing->currentInterestAmount();
-            $totals['count']++;
-            $totals['original_total'] += (float) $billing->original_amount;
-            $totals['interest_total'] += $interest;
-            $totals['updated_total'] += $updated;
-            if ($status === 'paid') {
-                $totals['received_total'] += $updated;
-            }
-            if (in_array($status, ['pending', 'overdue'], true)) {
-                $totals['pending_total'] += $updated;
-            }
-        });
-
-        return array_map(static fn (int|float $value): int|string => is_float($value) ? number_format($value, 2, '.', '') : $value, $totals);
+        return app(BillingReportTotals::class)->aggregate($query);
     }
 
     public function csv(array $filters): Response
