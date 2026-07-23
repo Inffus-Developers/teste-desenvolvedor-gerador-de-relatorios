@@ -63,7 +63,8 @@ Para gerar mais dados de teste:
 
 ```bash
 docker compose exec backend php artisan db:seed
-# ou com volume maior
+# volume configurável via env ou comando dedicado
+docker compose exec backend php artisan reports:seed-data --customers=500 --billings=50000
 docker compose exec -e BILLING_SEED_COUNT=50000 backend php artisan db:seed --class=BillingSeeder
 ```
 
