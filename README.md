@@ -1,451 +1,206 @@
-# Teste Técnico — Desenvolvedor Fullstack
+# Teste Técnico — Gerador de Relatórios (Inffus)
 
-## Objetivo
+Aplicação fullstack de faturamento com autenticação, gestão de clientes/cobranças e relatório de faturamento preparado para grandes volumes.
 
-Desenvolver uma aplicação simples de faturamento com autenticação e um módulo de relatórios preparado para trabalhar com grandes volumes de dados.
+## Stack
 
-O objetivo do teste é avaliar organização de código, modelagem de banco de dados, performance, domínio de backend e frontend, aplicação de regras de negócio e capacidade de justificar decisões técnicas.
+- **Backend:** PHP 8.4 + Laravel 13 + Sanctum + DomPDF
+- **Frontend:** Next.js 15 + TypeScript + Tailwind CSS
+- **Banco:** MySQL 8.4
+- **Filas:** RabbitMQ 3.13 (exportação assíncrona de relatórios)
+- **Infra:** Docker + Docker Compose + GitHub Actions (CI)
 
----
+## Como executar
 
-## Tecnologias obrigatórias
+Pré-requisitos: Docker e Docker Compose.
 
-### Backend
+```bash
+cp .env.example .env
+docker compose up --build
+```
 
-* PHP
-* Laravel
+Serviços:
 
-### Frontend
+| Serviço | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000/api |
+| Jaeger (traces) | http://localhost:16686 |
+| MySQL | localhost:3306 |
+| RabbitMQ Management | http://localhost:15672 (guest/guest) |
 
-* React ou Next.js
-* TypeScript
+Login padrão (seed):
 
-### Banco de dados
+- E-mail: `admin@inffus.test`
+- Senha: `password`
 
-* MySQL
+## Collection Postman (teste da API)
 
-### Infraestrutura
+Foi incluída uma collection Postman completa para facilitar a validação da API por quem for avaliar o desafio técnico — sem depender do frontend.
 
-* Docker
-* Docker Compose
+Arquivos em `postman/`:
 
----
+| Arquivo | Descrição |
+|---------|-----------|
+| `Inffus-Billing-API.postman_collection.json` | Todos os endpoints (auth, clientes, cobranças, relatórios sync/async) |
+| `Inffus-Billing-Local.postman_environment.json` | Variáveis locais (`baseUrl`, token, IDs) |
 
-## Contexto do projeto
+### Como importar
 
-A aplicação será utilizada para registrar cobranças realizadas para clientes.
+1. Abra o Postman (desktop ou web)
+2. **Import** → selecione os dois arquivos JSON da pasta `postman/`
+3. Ative o environment **Inffus Billing — Local (Docker)**
+4. Com `docker compose up` rodando, execute na ordem:
+   - `00 — Health Check → Backend Health`
+   - `01 — Auth → Login` (salva o Bearer token automaticamente)
+   - Demais requests conforme necessidade
 
-Cada cobrança deverá possuir informações como:
+A collection usa autenticação **Bearer token** herdada. O request **Login** não envia token; após o login, `{{token}}` é preenchido via script de teste.
 
-* Cliente
-* Descrição
-* Valor original
-* Data de emissão
-* Data de vencimento
-* Data de pagamento
-* Status
-* Taxa de juros
-* Valor final atualizado
+Fluxo recomendado para cobrir o escopo do teste: Login → List Customers → List Billings → Billing Report (JSON) → Export CSV/PDF (sync) → Queue Export → Get Export Status → Download Export → Register Payment → Logout.
 
-O sistema deverá possuir autenticação. Apenas usuários autenticados poderão acessar os registros e os relatórios.
+Para gerar mais dados de teste:
 
----
+```bash
+docker compose exec backend php artisan db:seed
+# volume configurável via env ou comando dedicado
+docker compose exec backend php artisan reports:seed-data --customers=500 --billings=50000
+docker compose exec -e BILLING_SEED_COUNT=50000 backend php artisan db:seed --class=BillingSeeder
+```
 
-## Funcionalidades obrigatórias
+## Como executar os testes
 
-### 1. Autenticação
+```bash
+docker compose exec backend php artisan test
+```
 
-O sistema deverá permitir:
+Os testes usam SQLite em memória (`phpunit.xml`).
 
-* Login
-* Logout
-* Proteção das rotas do sistema
-* Proteção dos endpoints da API
+## CI (GitHub Actions)
 
-Não é necessário desenvolver cadastro público de usuários.
+Pipeline em `.github/workflows/ci.yml`:
 
----
+- **Backend:** PHPUnit (PHP 8.4)
+- **Frontend:** ESLint + build Next.js
+- **Docker:** validação do `docker-compose.yml` + build das imagens
 
-### 2. Gestão de clientes
+Em produção real, o mesmo pipeline alimentaria ambientes de staging/homolog/prod; neste teste técnico mantemos CI executável no fork, sem dependência de infra externa.
 
-O sistema deverá permitir:
+## Arquitetura — exportação assíncrona
 
-* Cadastrar clientes
-* Editar clientes
-* Listar clientes
-* Visualizar os dados de um cliente
+O módulo de relatórios mantém exportação **síncrona** (CSV stream / PDF imediato) para volumes pequenos e adiciona exportação **assíncrona** via fila para grandes volumes.
 
-Dados mínimos do cliente:
+```text
+Frontend ──► Laravel API ──► MySQL
+                 │
+                 │ dispatch (ReportExportQueue)
+                 ▼
+            RabbitMQ (report.exports)
+                 │
+                 ▼
+         report-worker (reports:consume-exports)
+                 │
+                 ▼
+      storage/app/report-exports/{uuid}.csv|pdf
+                 │
+                 ▼
+Frontend ◄── polling status + download
+```
 
-* Nome
-* Documento
-* E-mail
-* Status
+O worker é um processo dedicado (`report-worker`) que consome mensagens RabbitMQ via `php-amqplib`, sem acoplar o CRUD ao pacote de filas do Laravel — evitando incompatibilidades de versão e mantendo controle sobre retry/ack.
 
----
+### Endpoints de exportação assíncrona
 
-### 3. Gestão de cobranças
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| `POST` | `/api/reports/billing/exports` | Enfileira exportação (`format`: csv ou pdf) |
+| `GET` | `/api/reports/billing/exports/{id}` | Consulta status (`pending` → `processing` → `completed` / `failed`) |
+| `GET` | `/api/reports/billing/exports/{id}/download` | Download do arquivo gerado |
 
-O sistema deverá permitir:
+Exportação síncrona (mantida):
 
-* Cadastrar cobranças
-* Editar cobranças
-* Listar cobranças
-* Visualizar uma cobrança
-* Registrar o pagamento de uma cobrança
+- `GET /api/reports/billing/export/csv`
+- `GET /api/reports/billing/export/pdf`
 
-Dados mínimos da cobrança:
+### Por que microserviço no worker de relatórios
 
-* Cliente
-* Descrição
-* Valor original
-* Data de emissão
-* Data de vencimento
-* Data de pagamento
-* Taxa de juros mensal
-* Status
+- Relatórios com milhões de linhas não devem bloquear a API HTTP.
+- PDF (DomPDF) consome memória; isolar em worker evita impacto no CRUD.
+- RabbitMQ permite retry, backpressure e escala horizontal de workers.
+- CRUD, auth e consulta paginada permanecem no monolito Laravel (escopo adequado ao teste).
 
----
+## Regra de juros (compostos)
 
-## Regra de negócio — cálculo de juros
-
-Quando uma cobrança estiver vencida e ainda não estiver paga, o sistema deverá calcular seu valor atualizado em tempo real.
-
-O cálculo deverá considerar:
-
-* Valor original
-* Taxa de juros mensal da cobrança
-* Quantidade de dias em atraso
-* Data atual
-
-O candidato poderá escolher entre juros simples ou juros compostos, desde que:
-
-* A regra utilizada esteja documentada
-* O cálculo seja realizado no backend
-* O resultado seja consistente em todas as telas e relatórios
-* O valor calculado não precise obrigatoriamente ser salvo no banco de dados
-
-Exemplo utilizando juros compostos:
+Cobranças vencidas e não pagas têm o valor atualizado calculado **em tempo real no backend**:
 
 ```text
 valor_atualizado = valor_original × (1 + taxa_mensal) ^ (dias_em_atraso / 30)
+juros = valor_atualizado - valor_original
 ```
 
-Ao registrar o pagamento, o sistema deverá armazenar:
+- Implementação: `backend/app/Services/InterestCalculator.php`
+- Cobrança paga **não** continua acumulando juros; no pagamento são persistidos `payment_date`, `paid_amount` e `interest_amount_at_payment`.
 
-* Data do pagamento
-* Valor efetivamente pago
-* Valor dos juros no momento do pagamento
+## Decisões técnicas
 
----
+- API REST com Laravel Sanctum (Bearer token) para proteger rotas e endpoints.
+- Frontend Next.js consome apenas a API; estado de sessão via `localStorage`.
+- Cálculo de juros centralizado no backend para garantir consistência em listagens, detalhe e relatórios.
+- Relatórios com filtros/ordenação/paginação no banco; eager load de `customer` para evitar N+1.
+- CSV streaming com `lazyById` (não carrega tudo em memória).
+- PDF síncrono limitado a 2.000 linhas; exportação em fila grava arquivo em disco para download posterior.
 
-## Módulo de relatórios
+## Estratégia de performance
 
-Desenvolver um relatório de faturamento por período.
+### Índices criados
 
-O relatório deverá permitir filtros por:
+**customers**
 
-* Data inicial
-* Data final
-* Cliente
-* Status da cobrança
+- `name`, `email`, `status`
+- `document` único
 
-O usuário deverá conseguir escolher se o período será baseado em:
+**billings**
 
-* Data de emissão
-* Data de vencimento
-* Data de pagamento
+- `customer_id`, `status`, `issue_date`, `due_date`, `payment_date`
+- compostos: `(status, issue_date)`, `(status, due_date)`, `(status, payment_date)`, `(customer_id, status)`, `(customer_id, issue_date)`
 
-O relatório deverá exibir:
+**report_exports**
 
-* Cliente
-* Descrição da cobrança
-* Data de emissão
-* Data de vencimento
-* Status
-* Valor original
-* Juros calculados
-* Valor atualizado
-* Valor pago
+- `(user_id, status)`, `created_at`
 
-Também deverão ser exibidos totalizadores:
+### Por que esses índices
 
-* Quantidade de cobranças
-* Valor original total
-* Total de juros
-* Valor atualizado total
-* Valor total recebido
-* Valor total pendente
+Os filtros do relatório combinam status + campo de data e opcionalmente cliente. Os compostos cobrem os caminhos mais comuns do `WHERE`/`ORDER BY` sem full scan em volumes altos.
 
----
+### Comportamento com milhões de registros
 
-## Exportação dos relatórios
+- Listagens e relatório paginam no MySQL.
+- Filtros e ordenação ficam na query.
+- Totalizadores percorrem o conjunto filtrado com cursor (`cursor()`), sem materializar a lista completa em arrays PHP.
+- Exportações grandes são enfileiradas; o worker processa com streaming (CSV) ou limite documentado (PDF).
 
-O relatório deverá poder ser exportado nos seguintes formatos:
+### Exportações em grande volume
 
-* PDF
-* CSV
+- **CSV síncrono/assíncrono:** stream por chunks de 500 IDs via `lazyById`.
+- **PDF síncrono/assíncrono:** renderização HTML→PDF em memória; teto de 2.000 linhas por job.
+- **Fila:** RabbitMQ com fila `report.exports`, worker dedicado, 3 tentativas, timeout de 600s.
 
-As exportações deverão respeitar os filtros aplicados pelo usuário.
+### Melhorias adicionais em produção
 
-O arquivo exportado deverá conter:
+- Armazenamento S3 + URL assinada para downloads
+- Dead-letter queue para jobs falhos
+- Read replica / particionamento por data em `billings`
+- Cache Redis de totalizadores
+- OpenTelemetry + Jaeger para traces e logs correlacionados (ver `docker compose` e http://localhost:16686)
+- CD para staging/homolog/prod com secrets por ambiente
 
-* Período selecionado
-* Filtros utilizados
-* Dados do relatório
-* Totalizadores
-
-A solução adotada para geração dos relatórios deverá ser definida pelo candidato.
-
----
-
-## Requisitos de performance
-
-O módulo de relatórios deverá ser projetado considerando tabelas com milhões de registros.
-
-A aplicação não precisa incluir milhões de registros no repositório, mas deverá possuir uma forma de gerar dados para testes.
-
-Requisitos obrigatórios:
-
-* Paginação realizada no backend
-* Filtros realizados no banco de dados
-* Ordenação realizada no backend
-* Não carregar todos os registros em memória
-* Evitar consultas N+1
-* Criar índices adequados no banco de dados
-* Utilizar migrations
-* Disponibilizar factories ou seeders para gerar um volume significativo de dados
-* Garantir que a exportação dos relatórios seja preparada para grandes volumes
-
-O candidato deverá explicar no README:
-
-* Quais índices foram criados
-* Por que esses índices foram escolhidos
-* Como o relatório se comportaria com milhões de registros
-* Como a exportação em PDF e CSV se comportaria com grandes volumes
-* Quais melhorias adicionais poderiam ser aplicadas em produção
-
----
-
-## Frontend
-
-O frontend deverá possuir, no mínimo:
-
-* Tela de login
-* Listagem de clientes
-* Cadastro e edição de clientes
-* Listagem de cobranças
-* Cadastro e edição de cobranças
-* Tela do relatório de faturamento
-* Filtros do relatório
-* Paginação
-* Ordenação
-* Exportação em PDF
-* Exportação em CSV
-* Estados de carregamento
-* Tratamento de erros
-* Feedback de operações realizadas com sucesso
-
-A interface não precisa possuir um design avançado, mas deverá ser organizada, responsiva e componentizada.
-
----
-
-## API
-
-A comunicação entre frontend e backend deverá ocorrer por API.
-
-A API deverá possuir:
-
-* Validação das requisições
-* Respostas HTTP adequadas
-* Tratamento de erros
-* Autenticação
-* Paginação
-* Filtros
-* Ordenação
-* Geração de relatórios em PDF
-* Geração de relatórios em CSV
-
-A estrutura e o padrão dos endpoints ficam a critério do candidato.
-
----
-
-## Dockerização
-
-O projeto deverá ser completamente executável por Docker.
-
-A estrutura deverá incluir, no mínimo:
-
-* Serviço do backend
-* Serviço do frontend
-* Serviço do MySQL
-* Arquivo `docker-compose.yml`
-* Configurações necessárias para comunicação entre os serviços
-* Persistência dos dados do banco
-* Instruções para subir o ambiente
-
-O projeto deverá poder ser iniciado com poucos comandos, sem necessidade de configurar manualmente PHP, Node.js ou MySQL na máquina local.
-
----
-
-## Testes automatizados
-
-O projeto deverá possuir testes automatizados no backend.
-
-Cenários mínimos:
-
-* Usuário não autenticado não acessa o relatório
-* Usuário não autenticado não exporta relatórios
-* Cálculo de juros para cobrança vencida
-* Cobrança paga não continua acumulando juros
-* Filtros do relatório
-* Totalizadores do relatório
-* Registro de pagamento
-* Exportação do relatório em PDF
-* Exportação do relatório em CSV
-
-Testes no frontend serão considerados um diferencial.
-
----
-
-## Uso de inteligência artificial
-
-O uso de ferramentas de inteligência artificial durante o desenvolvimento é permitido, mas não obrigatório.
-
-Caso sejam utilizadas ferramentas de IA, as configurações, instruções ou arquivos utilizados para orientar os agentes deverão ser mantidos dentro do repositório do projeto.
-
-Também será avaliada a forma como o candidato utiliza e configura agentes de IA no processo de desenvolvimento.
-
-Boas práticas no uso serão consideradas de forma positiva.
-
----
-
-## Organização dos commits
-
-O desenvolvimento deverá ser realizado com commits pequenos, semânticos e separados por responsabilidade.
-
-Evite concentrar toda a implementação em poucos commits grandes.
-
-Exemplos:
+## Estrutura
 
 ```text
-feat: add authentication structure
-feat: create customers module
-feat: create billing module
-feat: add overdue interest calculation
-feat: create billing report filters
-feat: add csv report export
-feat: add pdf report export
-test: add billing interest tests
-chore: add docker environment
-docs: update project instructions
+backend/           API Laravel + jobs de exportação
+frontend/          Next.js
+postman/           Collection Postman + environment local
+docker-compose.yml backend, frontend, mysql, rabbitmq, report-worker, jaeger
+.github/workflows/ CI
+.env.example
 ```
-
-Os commits também serão considerados durante a avaliação.
-
----
-
-## Entrega
-
-O candidato deverá realizar a entrega seguindo obrigatoriamente este fluxo:
-
-1. Criar um **fork** do repositório disponibilizado para o teste.
-2. Criar uma nova branch dentro do fork utilizando o próprio nome.
-
-Exemplo:
-
-```text
-joao-silva
-```
-
-3. Desenvolver toda a solução nessa branch.
-4. Manter o histórico de commits pequenos, semânticos e separados por responsabilidade.
-5. Ao finalizar, abrir um **Pull Request da branch criada no fork para o repositório original do teste**.
-
-Exemplo do fluxo:
-
-```text
-fork-do-candidato:joao-silva
-    ↓
-repositorio-original:main
-```
-
-O Pull Request deverá conter:
-
-* Título claro e objetivo
-* Resumo da solução desenvolvida
-* Instruções para executar o projeto
-* Instruções para executar os testes
-* Explicação das decisões técnicas
-* Explicação da estratégia de performance
-* Explicação da geração dos relatórios
-* Pontos que não foram concluídos, caso existam
-
-O repositório deverá conter:
-
-* Código do backend
-* Código do frontend
-* Dockerfiles
-* Arquivo `docker-compose.yml`
-* Migrations
-* Factories e seeders
-* Testes automatizados
-* Arquivo `.env.example`
-* Instruções para executar o projeto
-* Instruções para executar os testes
-* Explicação das decisões técnicas
-* Explicação da estratégia de performance
-
-Não serão aceitas entregas por arquivo compactado, e-mail, link para outro repositório ou qualquer outro meio externo.
-
-A entrega deverá ser realizada exclusivamente por meio do Pull Request aberto a partir do fork do candidato para o repositório original disponibilizado para o teste.
-
----
-
-## Critérios de avaliação
-
-Serão avaliados:
-
-* Organização e legibilidade do código
-* Arquitetura da aplicação
-* Modelagem do banco de dados
-* Qualidade da API
-* Componentização do frontend
-* Uso correto do TypeScript
-* Aplicação da regra de negócio
-* Performance das consultas
-* Estratégia de geração dos relatórios
-* Segurança e autenticação
-* Dockerização do projeto
-* Qualidade dos testes automatizados
-* Tratamento de erros
-* Documentação
-* Histórico de commits
-* Qualidade e organização do Pull Request
-* Configuração e uso de agentes de IA, caso utilizados
-
----
-
-## Diferenciais
-
-Serão considerados diferenciais:
-
-* Testes no frontend
-* Controle de acesso por perfil
-* Documentação da API
-* Uso de ferramentas de análise de consultas
-* Estratégia para geração de relatórios muito grandes
-* Cache de relatórios ou totalizadores
-* Pipeline de integração contínua
-* Monitoramento ou observabilidade
-* Cobertura de testes documentada
-
----
-
-## Prazo sugerido
-
-Prazo de entrega sugerido: até 5 dias corridos.
-
-O teste foi planejado para exigir aproximadamente 8 a 12 horas de desenvolvimento.
-
-Não é necessário implementar funcionalidades além das solicitadas. O foco deve estar na qualidade da solução, nas decisões técnicas e na clareza da implementação.
