@@ -31,6 +31,17 @@ services:
       timeout: 5s
       retries: 10
 
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: inffus-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "${JAEGER_UI_PORT:-16686}:16686"
+
   backend:
     build:
       context: ./backend
@@ -59,6 +70,16 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
       RABBITMQ_QUEUE: report.exports
+      LOG_CHANNEL: stack
+      LOG_STACK: stderr,otlp
+      OTEL_SDK_DISABLED: "false"
+      OTEL_SERVICE_NAME: billing-api
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: null
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_PROPAGATORS: tracecontext
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -66,6 +87,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     command: >
       sh -c "composer install --no-interaction &&
              php artisan key:generate --force &&
@@ -100,11 +123,24 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
       RABBITMQ_QUEUE: report.exports
+      LOG_CHANNEL: stack
+      LOG_STACK: stderr,otlp
+      OTEL_SDK_DISABLED: "false"
+      OTEL_SERVICE_NAME: billing-report-worker
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: null
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_PROPAGATORS: tracecontext
+      OTEL_WORKER_MODE_FLUSH_AFTER_EACH_ITERATION: "true"
     depends_on:
       mysql:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      jaeger:
+        condition: service_started
       backend:
         condition: service_started
     command: >

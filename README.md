@@ -25,6 +25,7 @@ Serviços:
 |---------|-----|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8000/api |
+| Jaeger (traces) | http://localhost:16686 |
 | MySQL | localhost:3306 |
 | RabbitMQ Management | http://localhost:15672 (guest/guest) |
 
@@ -66,7 +67,7 @@ O módulo de relatórios mantém exportação **síncrona** (CSV stream / PDF im
 ```text
 Frontend ──► Laravel API ──► MySQL
                  │
-                 │ dispatch ProcessReportExport
+                 │ dispatch (ReportExportQueue)
                  ▼
             RabbitMQ (report.exports)
                  │
@@ -164,7 +165,7 @@ Os filtros do relatório combinam status + campo de data e opcionalmente cliente
 - Dead-letter queue para jobs falhos
 - Read replica / particionamento por data em `billings`
 - Cache Redis de totalizadores
-- Observabilidade (slow query log, APM, métricas de fila)
+- OpenTelemetry + Jaeger para traces e logs correlacionados (ver `docker compose` e http://localhost:16686)
 - CD para staging/homolog/prod com secrets por ambiente
 
 ## Estrutura
@@ -172,7 +173,7 @@ Os filtros do relatório combinam status + campo de data e opcionalmente cliente
 ```text
 backend/           API Laravel + jobs de exportação
 frontend/          Next.js
-docker-compose.yml backend, frontend, mysql, rabbitmq, report-worker
+docker-compose.yml backend, frontend, mysql, rabbitmq, report-worker, jaeger
 .github/workflows/ CI
 .env.example
 ```

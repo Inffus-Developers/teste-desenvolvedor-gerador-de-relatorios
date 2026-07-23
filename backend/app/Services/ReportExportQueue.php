@@ -3,7 +3,8 @@
 namespace App\Services;
 
 use App\Models\ReportExport;
-use Illuminate\Support\Facades\Storage;
+use App\Support\Telemetry\TracePropagation;
+use Illuminate\Support\Facades\Log;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use RuntimeException;
@@ -28,6 +29,8 @@ class ReportExportQueue
                 json_encode(['export_id' => $export->id], JSON_THROW_ON_ERROR),
                 ['delivery_mode' => AMQPMessage::DELIVERY_MODE_PERSISTENT],
             );
+
+            TracePropagation::injectIntoMessage($message);
 
             $channel->basic_publish($message, '', $this->queueName());
         } finally {
@@ -56,6 +59,10 @@ class ReportExportQueue
                     $channel->basic_ack($message->getDeliveryTag());
                 } catch (Throwable $exception) {
                     $channel->basic_nack($message->getDeliveryTag(), false, false);
+                    Log::error('Report export job failed.', [
+                        'error' => $exception->getMessage(),
+                        'exception' => $exception::class,
+                    ]);
                     report($exception);
                 }
             },
