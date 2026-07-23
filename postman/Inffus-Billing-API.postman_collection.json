@@ -1,0 +1,779 @@
+{
+  "info": {
+    "_postman_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "name": "Inffus Billing API",
+    "description": "Collection completa da API REST do teste técnico Inffus (faturamento + relatórios).\n\n## Autenticação\n\nA API usa **Bearer token** (Laravel Sanctum). Execute **Auth → Login** primeiro; o token é salvo automaticamente em `{{token}}`.\n\nCredenciais padrão (seed): `admin@inffus.test` / `password`.\n\n## Fluxo sugerido para quem avalia o desafio\n\n1. **Health Check** — confirmar que o backend está no ar\n2. **Auth → Login** — obter token\n3. **Auth → Me** — validar sessão\n4. **Customers → List** — conferir dados seed\n5. **Billings → List** — conferir cobranças e juros\n6. **Reports → Billing Report (JSON)** — filtros, paginação e totalizadores\n7. **Reports → Export CSV/PDF (sync)** — download imediato\n8. **Reports → Queue Export** → **Get Export Status** → **Download Export** — fluxo assíncrono via RabbitMQ\n9. **Billings → Register Payment** — registrar pagamento com juros calculados\n10. **Auth → Logout** — encerrar token\n\n## Variáveis\n\n| Variável | Descrição |\n|----------|------------|\n| `baseUrl` | Base da API (padrão: `http://localhost:8000/api`) |\n| `token` | Bearer token (preenchido pelo Login) |\n| `customerId` | ID usado em rotas `{customer}` |\n| `billingId` | ID usado em rotas `{billing}` |\n| `exportId` | ID da exportação assíncrona |\n\nImporte também o environment `Inffus-Billing-Local.postman_environment.json`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000/api"
+    },
+    {
+      "key": "healthUrl",
+      "value": "http://localhost:8000/up"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "customerId",
+      "value": "1"
+    },
+    {
+      "key": "billingId",
+      "value": "1"
+    },
+    {
+      "key": "exportId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 — Health Check",
+      "item": [
+        {
+          "name": "Backend Health",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{healthUrl}}",
+            "description": "Endpoint `/up` do Laravel. Não requer autenticação."
+          },
+          "response": []
+        }
+      ],
+      "description": "Verificação rápida de que o backend está respondendo antes dos testes autenticados."
+    },
+    {
+      "name": "01 — Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('token', body.token);",
+                  "    pm.environment.set('token', body.token);",
+                  "    pm.test('Token recebido', function () {",
+                  "        pm.expect(body.token).to.be.a('string').and.not.empty;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@inffus.test\",\n  \"password\": \"password\"\n}"
+            },
+            "url": "{{baseUrl}}/login",
+            "description": "Autenticação via Sanctum. Retorna `token` e `user`. Limite: 5 tentativas/minuto."
+          },
+          "response": []
+        },
+        {
+          "name": "Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Usuário autenticado', function () {",
+                  "    pm.expect(pm.response.json().user).to.be.an('object');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/me",
+            "description": "Retorna o usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.collectionVariables.unset('token');",
+                  "pm.environment.unset('token');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/logout",
+            "description": "Revoga o token atual."
+          },
+          "response": []
+        }
+      ],
+      "description": "Autenticação Bearer token. Execute Login antes das demais pastas."
+    },
+    {
+      "name": "02 — Customers",
+      "item": [
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers?per_page=15&sort_by=name&sort_dir=asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Nome, documento ou e-mail",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "active | inactive",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_by",
+                  "value": "name",
+                  "description": "id, name, document, email, status, created_at"
+                },
+                {
+                  "key": "sort_dir",
+                  "value": "asc",
+                  "description": "asc | desc"
+                },
+                {
+                  "key": "per_page",
+                  "value": "15",
+                  "description": "1–100"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lista paginada de clientes."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const id = pm.response.json().data.id;",
+                  "    pm.collectionVariables.set('customerId', String(id));",
+                  "    pm.environment.set('customerId', String(id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cliente Postman\",\n  \"document\": \"12345678000199\",\n  \"email\": \"postman.cliente@example.com\",\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{baseUrl}}/customers",
+            "description": "Cria cliente. Ajuste `document` se já existir (unique)."
+          },
+          "response": []
+        },
+        {
+          "name": "Show Customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/customers/{{customerId}}",
+            "description": "Detalhe do cliente. Usa variável `customerId`."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cliente Postman Atualizado\",\n  \"document\": \"12345678000199\",\n  \"email\": \"postman.cliente@example.com\",\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{baseUrl}}/customers/{{customerId}}",
+            "description": "Atualiza cliente existente."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/customers/{{customerId}}",
+            "description": "Remove cliente. Retorna 204."
+          },
+          "response": []
+        }
+      ],
+      "description": "CRUD de clientes."
+    },
+    {
+      "name": "03 — Billings",
+      "item": [
+        {
+          "name": "List Billings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billings?per_page=15&sort_by=due_date&sort_dir=asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billings"
+              ],
+              "query": [
+                {
+                  "key": "customer_id",
+                  "value": "{{customerId}}",
+                  "description": "Filtrar por cliente",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "overdue",
+                  "description": "pending | overdue | paid | cancelled",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_by",
+                  "value": "due_date",
+                  "description": "id, issue_date, due_date, payment_date, original_amount, status, created_at"
+                },
+                {
+                  "key": "sort_dir",
+                  "value": "asc"
+                },
+                {
+                  "key": "per_page",
+                  "value": "15"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lista paginada de cobranças com valores e juros calculados."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Billing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const id = pm.response.json().data.id;",
+                  "    pm.collectionVariables.set('billingId', String(id));",
+                  "    pm.environment.set('billingId', String(id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": {{customerId}},\n  \"description\": \"Cobrança criada via Postman\",\n  \"original_amount\": 1500.00,\n  \"issue_date\": \"2026-07-01\",\n  \"due_date\": \"2026-06-01\",\n  \"monthly_interest_rate\": 0.02,\n  \"status\": \"pending\"\n}"
+            },
+            "url": "{{baseUrl}}/billings",
+            "description": "Cria cobrança. `due_date` anterior à hoje gera status derivado `overdue` com juros compostos."
+          },
+          "response": []
+        },
+        {
+          "name": "Show Billing",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/billings/{{billingId}}",
+            "description": "Detalhe da cobrança incluindo juros e valor atualizado."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Billing",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": {{customerId}},\n  \"description\": \"Cobrança atualizada via Postman\",\n  \"original_amount\": 1500.00,\n  \"issue_date\": \"2026-07-01\",\n  \"due_date\": \"2026-06-01\",\n  \"monthly_interest_rate\": 0.02,\n  \"status\": \"pending\"\n}"
+            },
+            "url": "{{baseUrl}}/billings/{{billingId}}",
+            "description": "Atualiza cobrança. Cobranças pagas não podem ser editadas."
+          },
+          "response": []
+        },
+        {
+          "name": "Register Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_date\": \"2026-07-22\"\n}"
+            },
+            "url": "{{baseUrl}}/billings/{{billingId}}/pay",
+            "description": "Registra pagamento. Calcula juros compostos na data informada e persiste `paid_amount`."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Billing",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/billings/{{billingId}}",
+            "description": "Remove cobrança. Retorna 204."
+          },
+          "response": []
+        }
+      ],
+      "description": "CRUD de cobranças + registro de pagamento."
+    },
+    {
+      "name": "04 — Reports",
+      "item": [
+        {
+          "name": "Billing Report (JSON)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/billing?per_page=15&sort_by=due_date&sort_dir=desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "billing"
+              ],
+              "query": [
+                {
+                  "key": "date_from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "date_field",
+                  "value": "due_date",
+                  "description": "issue_date | due_date | payment_date",
+                  "disabled": true
+                },
+                {
+                  "key": "customer_id",
+                  "value": "{{customerId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "overdue",
+                  "description": "pending | overdue | paid | cancelled",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_by",
+                  "value": "due_date"
+                },
+                {
+                  "key": "sort_dir",
+                  "value": "desc"
+                },
+                {
+                  "key": "per_page",
+                  "value": "15"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Relatório paginado com totalizadores em `totals`."
+          },
+          "response": []
+        },
+        {
+          "name": "Export CSV (sync)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/billing/export/csv?sort_by=due_date&sort_dir=desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "billing",
+                "export",
+                "csv"
+              ],
+              "query": [
+                {
+                  "key": "date_from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "overdue",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_by",
+                  "value": "due_date"
+                },
+                {
+                  "key": "sort_dir",
+                  "value": "desc"
+                }
+              ]
+            },
+            "description": "Download CSV imediato (stream). Mesmos filtros do relatório JSON."
+          },
+          "response": []
+        },
+        {
+          "name": "Export PDF (sync)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/pdf"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/billing/export/pdf?sort_by=due_date&sort_dir=desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "billing",
+                "export",
+                "pdf"
+              ],
+              "query": [
+                {
+                  "key": "date_from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "overdue",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_by",
+                  "value": "due_date"
+                },
+                {
+                  "key": "sort_dir",
+                  "value": "desc"
+                }
+              ]
+            },
+            "description": "Download PDF imediato. Limite de 2.000 linhas."
+          },
+          "response": []
+        },
+        {
+          "name": "Queue Export (async)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const id = pm.response.json().data.id;",
+                  "    pm.collectionVariables.set('exportId', id);",
+                  "    pm.environment.set('exportId', id);",
+                  "    pm.test('Export enfileirada', function () {",
+                  "        pm.expect(id).to.be.a('string').and.not.empty;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"csv\",\n  \"status\": \"overdue\",\n  \"sort_by\": \"due_date\",\n  \"sort_dir\": \"desc\"\n}"
+            },
+            "url": "{{baseUrl}}/reports/billing/exports",
+            "description": "Enfileira exportação via RabbitMQ. Requer `report-worker` ativo. Retorna 202."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Export Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const status = pm.response.json().data.status;",
+                  "    pm.test('Status válido', function () {",
+                  "        pm.expect(['pending', 'processing', 'completed', 'failed']).to.include(status);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/reports/billing/exports/{{exportId}}",
+            "description": "Polling de status: pending → processing → completed | failed."
+          },
+          "response": []
+        },
+        {
+          "name": "Download Export (async)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "*/*"
+              }
+            ],
+            "url": "{{baseUrl}}/reports/billing/exports/{{exportId}}/download",
+            "description": "Download do arquivo gerado. Disponível apenas quando status = completed."
+          },
+          "response": []
+        }
+      ],
+      "description": "Relatório de faturamento: consulta JSON, exportação síncrona e assíncrona."
+    }
+  ]
+}

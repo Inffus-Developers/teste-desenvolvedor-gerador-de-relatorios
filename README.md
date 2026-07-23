@@ -34,6 +34,31 @@ Login padrão (seed):
 - E-mail: `admin@inffus.test`
 - Senha: `password`
 
+## Collection Postman (teste da API)
+
+Foi incluída uma collection Postman completa para facilitar a validação da API por quem for avaliar o desafio técnico — sem depender do frontend.
+
+Arquivos em `postman/`:
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `Inffus-Billing-API.postman_collection.json` | Todos os endpoints (auth, clientes, cobranças, relatórios sync/async) |
+| `Inffus-Billing-Local.postman_environment.json` | Variáveis locais (`baseUrl`, token, IDs) |
+
+### Como importar
+
+1. Abra o Postman (desktop ou web)
+2. **Import** → selecione os dois arquivos JSON da pasta `postman/`
+3. Ative o environment **Inffus Billing — Local (Docker)**
+4. Com `docker compose up` rodando, execute na ordem:
+   - `00 — Health Check → Backend Health`
+   - `01 — Auth → Login` (salva o Bearer token automaticamente)
+   - Demais requests conforme necessidade
+
+A collection usa autenticação **Bearer token** herdada. O request **Login** não envia token; após o login, `{{token}}` é preenchido via script de teste.
+
+Fluxo recomendado para cobrir o escopo do teste: Login → List Customers → List Billings → Billing Report (JSON) → Export CSV/PDF (sync) → Queue Export → Get Export Status → Download Export → Register Payment → Logout.
+
 Para gerar mais dados de teste:
 
 ```bash
@@ -173,6 +198,7 @@ Os filtros do relatório combinam status + campo de data e opcionalmente cliente
 ```text
 backend/           API Laravel + jobs de exportação
 frontend/          Next.js
+postman/           Collection Postman + environment local
 docker-compose.yml backend, frontend, mysql, rabbitmq, report-worker, jaeger
 .github/workflows/ CI
 .env.example
