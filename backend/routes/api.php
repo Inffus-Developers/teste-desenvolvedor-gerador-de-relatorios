@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ChargeController;
+use App\Http\Controllers\ClientController;
 use Illuminate\Support\Facades\Auth;
 
 // Rota pública: Login
@@ -44,5 +45,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::apiResource('charges', ChargeController::class);
+    Route::apiResource('clients', ClientController::class);
     Route::get('report/charges', [ChargeController::class, 'report']);
 });
