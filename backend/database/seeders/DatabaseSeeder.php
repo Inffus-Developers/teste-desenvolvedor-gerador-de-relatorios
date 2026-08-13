@@ -7,6 +7,8 @@ use App\Models\Client;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+use Database\Seeders\AdminUserSeeder;
+
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
@@ -16,14 +18,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call(AdminUserSeeder::class);
 
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
 
-        // Seed clients for testing
-        Client::factory()->count(50)->create();
+        if (Client::count() === 0) {
+            Client::factory()->count(50)->create();
+        }
     }
 }
