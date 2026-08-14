@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Charge extends Model
@@ -17,26 +19,48 @@ class Charge extends Model
         'payment_date',
         'status',
         'interest_rate',
+        'paid_amount',
+        'paid_interest',
     ];
 
-    protected $appends = ['final_amount'];
+    protected $casts = [
+        'issue_date' => 'date',
+        'due_date' => 'date',
+        'payment_date' => 'date',
+        'original_amount' => 'decimal:2',
+        'interest_rate' => 'decimal:2',
+        'paid_amount' => 'decimal:2',
+        'paid_interest' => 'decimal:2',
+    ];
 
-    public function getFinalAmountAttribute()
+    protected $appends = ['final_amount', 'interest_amount'];
+
+    public function getInterestAmountAttribute(): float
     {
-        if ($this->status === 'paga' || $this->status === 'cancelada' || !$this->due_date) {
-            return $this->original_amount;
+        if (! $this->due_date || in_array($this->status, ['paga', 'cancelada'], true)) {
+            return 0.0;
         }
 
-        $dueDate = \Carbon\Carbon::parse($this->due_date);
-        $now = \Carbon\Carbon::now();
+        $dueDate = Carbon::parse($this->due_date);
+        $now = Carbon::now();
 
         if ($now->lessThanOrEqualTo($dueDate)) {
-            return $this->original_amount;
+            return 0.0;
         }
 
-        $daysLate = $now->diffInDays($dueDate);
-        $interest = ($this->interest_rate / 100) * $this->original_amount * $daysLate;
+        $daysLate = max(0, $dueDate->diffInDays($now));
+        $monthlyRate = (float) $this->interest_rate / 100;
+        $factor = pow(1 + $monthlyRate, $daysLate / 30);
 
-        return $this->original_amount + $interest;
+        return round((float) $this->original_amount * ($factor - 1), 2);
+    }
+
+    public function getFinalAmountAttribute(): float
+    {
+        if ($this->status === 'paga' || $this->status === 'cancelada' || ! $this->due_date) {
+            return (float) $this->original_amount;
+        }
+
+        return round((float) $this->original_amount + $this->interest_amount, 2);
     }
 }

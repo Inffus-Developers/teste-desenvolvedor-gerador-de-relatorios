@@ -45,6 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::apiResource('charges', ChargeController::class);
+    Route::post('charges/{charge}/pay', [ChargeController::class, 'pay']);
     Route::apiResource('clients', ClientController::class);
     Route::get('report/charges', [ChargeController::class, 'report']);
 });

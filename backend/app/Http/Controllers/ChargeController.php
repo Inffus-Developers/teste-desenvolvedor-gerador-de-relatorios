@@ -3,72 +3,131 @@
 namespace App\Http\Controllers;
 
 use App\Models\Charge;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ChargeController extends Controller
 {
     public function index(Request $request)
     {
         $query = Charge::query();
-        
-        if ($request->has('status')) {
+
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
-        
-        return response()->json($query->paginate(15));
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('client_name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        $perPage = (int) $request->input('per_page', 15);
+
+        return response()->json($query->orderByDesc('due_date')->paginate($perPage));
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $data = $request->validate([
             'client_name' => 'required|string|max:255',
             'description' => 'required|string',
-            'original_amount' => 'required|numeric',
+            'original_amount' => 'required|numeric|min:0.01',
             'issue_date' => 'required|date',
-            'due_date' => 'required|date',
-            'status' => 'in:pendente,paga,atrasada,cancelada',
-            'interest_rate' => 'numeric'
+            'due_date' => ['required', 'date', 'after_or_equal:issue_date'],
+            'payment_date' => 'nullable|date|after_or_equal:issue_date',
+            'status' => ['required', Rule::in(['pendente', 'paga', 'atrasada', 'cancelada'])],
+            'interest_rate' => 'required|numeric|min:0|max:100',
+            'paid_amount' => 'nullable|numeric|min:0',
+            'paid_interest' => 'nullable|numeric|min:0',
         ]);
 
-        $charge = Charge::create($validated);
+        if (($data['status'] ?? 'pendente') === 'paga' && empty($data['payment_date'])) {
+            $data['payment_date'] = now()->toDateString();
+        }
+
+        $charge = Charge::create($data);
+
         return response()->json($charge, 201);
     }
 
     public function show(Charge $charge)
     {
-        return response()->json($charge);
+        return response()->json($charge->loadMissing('client'));
     }
 
     public function update(Request $request, Charge $charge)
     {
-        $validated = $request->validate([
-            'client_name' => 'string|max:255',
-            'description' => 'string',
-            'original_amount' => 'numeric',
-            'issue_date' => 'date',
-            'due_date' => 'date',
-            'status' => 'in:pendente,paga,atrasada,cancelada',
-            'interest_rate' => 'numeric',
-            'payment_date' => 'nullable|date'
+        $data = $request->validate([
+            'client_name' => 'sometimes|required|string|max:255',
+            'description' => 'sometimes|required|string',
+            'original_amount' => 'sometimes|required|numeric|min:0.01',
+            'issue_date' => 'sometimes|required|date',
+            'due_date' => ['sometimes', 'required', 'date', 'after_or_equal:issue_date'],
+            'payment_date' => 'nullable|date|after_or_equal:issue_date',
+            'status' => ['sometimes', 'required', Rule::in(['pendente', 'paga', 'atrasada', 'cancelada'])],
+            'interest_rate' => 'sometimes|required|numeric|min:0|max:100',
+            'paid_amount' => 'nullable|numeric|min:0',
+            'paid_interest' => 'nullable|numeric|min:0',
         ]);
 
-        $charge->update($validated);
+        if (isset($data['status']) && $data['status'] === 'paga' && empty($data['payment_date']) && empty($charge->payment_date)) {
+            $data['payment_date'] = now()->toDateString();
+        }
+
+        $charge->update($data);
+
+        return response()->json($charge);
+    }
+
+    public function pay(Request $request, Charge $charge)
+    {
+        $data = $request->validate([
+            'payment_date' => 'nullable|date',
+            'paid_amount' => 'nullable|numeric|min:0',
+            'paid_interest' => 'nullable|numeric|min:0',
+        ]);
+
+        $data['payment_date'] = $data['payment_date'] ?? Carbon::now()->toDateString();
+        $data['paid_amount'] = $data['paid_amount'] ?? $charge->final_amount;
+        $data['paid_interest'] = $data['paid_interest'] ?? max($charge->final_amount - $charge->original_amount, 0);
+        $data['status'] = 'paga';
+
+        $charge->update($data);
+
         return response()->json($charge);
     }
 
     public function destroy(Charge $charge)
     {
         $charge->delete();
+
         return response()->json(null, 204);
     }
 
     public function report(Request $request)
     {
-        // Relatório otimizado usando chunking ou lazy loading
-        $charges = Charge::lazy(); // Lazy Collection ideal para lidar com grandes volumes
-        
-        // Aqui simularíamos o retorno paginado ou processamento massivo.
-        // Como é uma resposta HTTP, paginação é necessária para não estourar a memória e o tempo limite:
-        return response()->json(Charge::paginate(500));
+        $charges = Charge::query();
+
+        if ($request->filled('status')) {
+            $charges->where('status', $request->status);
+        }
+
+        if ($request->filled('client')) {
+            $charges->where('client_name', 'like', "%{$request->client}%");
+        }
+
+        if ($request->filled('start_date')) {
+            $charges->whereDate('issue_date', '>=', $request->start_date);
+        }
+
+        if ($request->filled('end_date')) {
+            $charges->whereDate('issue_date', '<=', $request->end_date);
+        }
+
+        return response()->json($charges->orderByDesc('issue_date')->paginate(500));
     }
 }
