@@ -227,6 +227,54 @@ O candidato deverá explicar no README:
 * Como a exportação em PDF e CSV se comportaria com grandes volumes
 * Quais melhorias adicionais poderiam ser aplicadas em produção
 
+### Índices criados
+
+Os principais índices foram adicionados na migration [backend/database/migrations/2026_08_14_000002_add_report_performance_indexes.php](backend/database/migrations/2026_08_14_000002_add_report_performance_indexes.php):
+
+* `charges_client_name_index` em `client_name`
+* `charges_issue_date_index` em `issue_date`
+* `charges_due_date_index` em `due_date`
+* `charges_payment_date_index` em `payment_date`
+* `charges_status_issue_date_index` em `(status, issue_date)`
+* `charges_status_due_date_index` em `(status, due_date)`
+* `charges_status_payment_date_index` em `(status, payment_date)`
+* `clients_status_index` em `status`
+* `clients_email_index` em `email`
+* `clients_name_index` em `name`
+
+Esses índices foram escolhidos porque os filtros e ordenações do relatório usam, prioritariamente, datas, status e nome do cliente. Em consultas com milhões de registros, sem índices a base precisaria fazer scans completos, o que tornaria o relatório lento e caro. Com esses índices, o banco consegue localizar um subconjunto menor de linhas antes de aplicar ordenação e paginação.
+
+### Como o relatório se comporta com milhões de registros
+
+A API de relatório usa paginação no backend, filtros aplicados no banco e ordenação no backend. Isso elimina a necessidade de carregar todas as linhas em memória, reduzindo o uso de memória e mantendo a resposta responsiva mesmo com milhões de registros. As consultas de relatório ficam restritas ao intervalo de datas, status e cliente selecionados, e a ordenação por `issue_date`, `due_date` ou `payment_date` é delegada ao banco.
+
+Para cenários de grande volume, o comportamento esperado continua estável porque a resposta do endpoint é paginada, com o backend retornando lotes menores. A aplicação também evita N+1 criando as consultas de forma direta no controlador e sem carregamento explícito de relacionamentos em laço.
+
+### Exportação em PDF e CSV em grandes volumes
+
+A exportação foi pensada para seguir o mesmo contrato de filtros e paginação do relatório, mas em modo de lote. Em CSV, o melhor caminho é processar por chunks em streaming para não consumir memória excessiva, escrevendo linha a linha sem carregar todas as cobranças em memória. Em PDF, a estratégia ideal é gerar o documento com paginação e processamento em lote, evitando montar a árvore inteira do relatório em um único objeto gigantesco.
+
+Em produção, o ideal é separar a geração de exportação para uma fila assíncrona (Jobs/Queue) e entregar o arquivo em background, para que a tela não espere o processamento completo e o usuário possa receber o arquivo ou acompanhar o progresso.
+
+### Geração de dados para testes
+
+O comando abaixo foi adicionado para gerar volume de dados de teste:
+
+```bash
+php artisan report:generate 50000
+```
+
+Esse comando cria um conjunto de clientes e cobranças sintéticas para validar o comportamento do relatório em volumes altos, sem precisar manter milhões de registros no repositório.
+
+### Melhorias adicionais em produção
+
+* Utilizar índices compostos mais específicos por tipo de consulta e por filtro mais frequente
+* Adicionar cache de agregados para relatórios muito recorrentes
+* Separar exportação em filas e armazenamento em disco/S3
+* Utilizar leitura e escrita em replicas para aliviar a base primária
+* Aplicar paginação cursor-based em endpoints muito grandes e muito consultados
+* Considerar partições por data em tabelas altamente volumosas
+
 ---
 
 ## Frontend
