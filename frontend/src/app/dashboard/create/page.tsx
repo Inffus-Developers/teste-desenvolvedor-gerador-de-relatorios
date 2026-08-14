@@ -4,10 +4,14 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useToast } from '@/contexts/ToastContext';
+import { Button, Input, Select, Card } from '@/components';
 
 export default function CreateCharge() {
   const router = useRouter();
+  const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     client_name: '',
     description: '',
@@ -18,15 +22,37 @@ export default function CreateCharge() {
     interest_rate: '0'
   });
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData({...formData, [name]: value});
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.client_name.trim()) newErrors.client_name = 'Cliente é obrigatório';
+    if (!formData.description.trim()) newErrors.description = 'Descrição é obrigatória';
+    if (!formData.original_amount || parseFloat(formData.original_amount) <= 0) newErrors.original_amount = 'Valor deve ser maior que 0';
+    if (!formData.issue_date) newErrors.issue_date = 'Data de emissão é obrigatória';
+    if (!formData.due_date) newErrors.due_date = 'Data de vencimento é obrigatória';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) return;
+
     setLoading(true);
     try {
       await api.post('/charges', formData);
+      addToast('Cobrança criada com sucesso!', 'success', 'Sucesso');
       router.push('/dashboard');
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao salvar a cobrança. Verifique os dados.');
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Erro ao salvar a cobrança. Verifique os dados.';
+      addToast(message, 'error', 'Erro');
     } finally {
       setLoading(false);
     }
@@ -34,67 +60,107 @@ export default function CreateCharge() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center gap-4 mb-4">
-        <Link href="/dashboard" style={{ color: 'var(--text-muted)' }}>← Voltar</Link>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+        <Link
+          href="/dashboard"
+          style={{
+            color: 'var(--text-muted)',
+            textDecoration: 'none',
+            fontSize: '1.2rem',
+            cursor: 'pointer',
+          }}
+        >
+          ← Voltar
+        </Link>
         <h1 style={{ margin: 0 }}>Nova Cobrança</h1>
       </div>
 
-      <div className="card">
+      <Card>
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Nome do Cliente</label>
-              <input type="text" className="input-field" required 
-                value={formData.client_name} onChange={e => setFormData({...formData, client_name: e.target.value})} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+            <Input
+              label="Cliente"
+              name="client_name"
+              value={formData.client_name}
+              onChange={handleChange}
+              error={errors.client_name}
+              required
+            />
+
+            <Input
+              label="Valor Original (R$)"
+              name="original_amount"
+              type="number"
+              step="0.01"
+              value={formData.original_amount}
+              onChange={handleChange}
+              error={errors.original_amount}
+              required
+            />
+
+            <div style={{ gridColumn: 'span 2' }}>
+              <Input
+                label="Descrição da Cobrança"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                error={errors.description}
+                required
+              />
             </div>
 
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Valor Original (R$)</label>
-              <input type="number" step="0.01" className="input-field" required 
-                value={formData.original_amount} onChange={e => setFormData({...formData, original_amount: e.target.value})} />
-            </div>
+            <Input
+              label="Data de Emissão"
+              name="issue_date"
+              type="date"
+              value={formData.issue_date}
+              onChange={handleChange}
+              error={errors.issue_date}
+              required
+            />
 
-            <div className="input-group" style={{ gridColumn: 'span 2', marginBottom: 0 }}>
-              <label className="input-label">Descrição da Cobrança</label>
-              <input type="text" className="input-field" required 
-                value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-            </div>
+            <Input
+              label="Data de Vencimento"
+              name="due_date"
+              type="date"
+              value={formData.due_date}
+              onChange={handleChange}
+              error={errors.due_date}
+              required
+            />
 
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Data de Emissão</label>
-              <input type="date" className="input-field" required 
-                value={formData.issue_date} onChange={e => setFormData({...formData, issue_date: e.target.value})} />
-            </div>
+            <Select
+              label="Status Inicial"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              options={[
+                { value: 'pendente', label: 'Pendente' },
+                { value: 'paga', label: 'Paga' },
+                { value: 'atrasada', label: 'Atrasada' },
+              ]}
+            />
 
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Data de Vencimento</label>
-              <input type="date" className="input-field" required 
-                value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} />
-            </div>
-
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Status Inicial</label>
-              <select className="input-field" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                <option value="pendente">Pendente</option>
-                <option value="paga">Paga</option>
-                <option value="atrasada">Atrasada</option>
-              </select>
-            </div>
-
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Taxa de Juros ao Dia (%)</label>
-              <input type="number" step="0.01" className="input-field" required 
-                value={formData.interest_rate} onChange={e => setFormData({...formData, interest_rate: e.target.value})} />
-            </div>
+            <Input
+              label="Taxa de Juros ao Dia (%)"
+              name="interest_rate"
+              type="number"
+              step="0.01"
+              value={formData.interest_rate}
+              onChange={handleChange}
+            />
           </div>
 
-          <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Salvando...' : 'Salvar Cobrança'}
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+            <Link href="/dashboard" style={{ textDecoration: 'none' }}>
+              <Button variant="secondary">Cancelar</Button>
+            </Link>
+            <Button type="submit" variant="primary" loading={loading}>
+              Salvar Cobrança
+            </Button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

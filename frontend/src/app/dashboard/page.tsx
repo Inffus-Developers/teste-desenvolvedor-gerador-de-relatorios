@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import Link from 'next/link';
+import { useToast } from '@/contexts/ToastContext';
+import { Button, Input, Card, Loading, Alert } from '@/components';
 
 interface Charge {
   id: number;
@@ -18,8 +20,11 @@ interface Charge {
 }
 
 export default function Dashboard() {
+  const { addToast } = useToast();
   const [charges, setCharges] = useState<Charge[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedCharge, setSelectedCharge] = useState<Charge | null>(null);
   const [paymentForm, setPaymentForm] = useState({
     payment_date: '',
@@ -32,23 +37,39 @@ export default function Dashboard() {
   }, []);
 
   const fetchCharges = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await api.get('/charges');
       setCharges(res.data.data ?? res.data);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Erro ao carregar cobranças';
+      setError(message);
+      addToast(message, 'error', 'Erro');
     } finally {
       setLoading(false);
     }
   };
 
   const getStatusBadge = (status: string) => {
-    switch(status) {
-      case 'paga': return <span className="badge badge-success">Paga</span>;
-      case 'pendente': return <span className="badge badge-warning">Pendente</span>;
-      case 'atrasada': return <span className="badge badge-danger">Atrasada</span>;
-      default: return <span className="badge" style={{ background: 'var(--border)' }}>{status}</span>;
-    }
+    const colors: Record<string, string> = {
+      paga: '#22c55e',
+      pendente: '#f97316',
+      atrasada: '#dc2626',
+      cancelada: '#6b7280',
+    };
+    return (
+      <span style={{
+        padding: '0.25rem 0.75rem',
+        borderRadius: '0.25rem',
+        backgroundColor: colors[status] + '20',
+        color: colors[status],
+        fontSize: '0.875rem',
+        fontWeight: 500,
+      }}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
   };
 
   const formatCurrency = (val: number) => {
@@ -59,6 +80,7 @@ export default function Dashboard() {
     e.preventDefault();
     if (!selectedCharge) return;
 
+    setPaymentLoading(true);
     try {
       await api.post(`/charges/${selectedCharge.id}/pay`, {
         payment_date: paymentForm.payment_date || undefined,
@@ -69,98 +91,132 @@ export default function Dashboard() {
       setSelectedCharge(null);
       setPaymentForm({ payment_date: '', paid_amount: '', paid_interest: '' });
       await fetchCharges();
-      alert('Pagamento registrado com sucesso!');
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao registrar pagamento.');
+      addToast('Pagamento registrado com sucesso!', 'success', 'Sucesso');
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Erro ao registrar pagamento';
+      addToast(message, 'error', 'Erro');
+    } finally {
+      setPaymentLoading(false);
     }
   };
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ marginBottom: '0.25rem' }}>Cobranças</h1>
           <p style={{ color: 'var(--text-muted)' }}>Gerencie os faturamentos dos seus clientes.</p>
         </div>
-        <Link href="/dashboard/create" className="btn btn-primary">
-          + Nova Cobrança
+        <Link href="/dashboard/create" style={{ textDecoration: 'none' }}>
+          <Button variant="primary">+ Nova Cobrança</Button>
         </Link>
       </div>
 
-      {selectedCharge && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ marginTop: 0 }}>Registrar pagamento</h3>
-          <p style={{ color: 'var(--text-muted)' }}>
-            {selectedCharge.client_name} — {formatCurrency(selectedCharge.final_amount)}
-          </p>
-          <form onSubmit={handlePaymentSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem' }}>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Data do pagamento</label>
-              <input type="date" className="input-field" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} />
-            </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Valor efetivamente pago</label>
-              <input type="number" step="0.01" className="input-field" value={paymentForm.paid_amount} onChange={(e) => setPaymentForm({ ...paymentForm, paid_amount: e.target.value })} placeholder={String(selectedCharge.final_amount)} />
-            </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Juros no pagamento</label>
-              <input type="number" step="0.01" className="input-field" value={paymentForm.paid_interest} onChange={(e) => setPaymentForm({ ...paymentForm, paid_interest: e.target.value })} placeholder={String(selectedCharge.interest_amount || 0)} />
-            </div>
-            <div style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button type="button" className="btn" onClick={() => setSelectedCharge(null)} style={{ background: 'var(--surface-hover)' }}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Salvar pagamento</button>
-            </div>
-          </form>
-        </div>
+      {error && (
+        <Alert
+          variant="error"
+          title="Erro"
+          message={error}
+          onClose={() => setError(null)}
+        />
       )}
 
-      <div className="card mt-4" style={{ padding: 0, overflow: 'hidden' }}>
+      {selectedCharge && (
+        <Card style={{ marginBottom: '2rem' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>Registrar Pagamento</h3>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+            <strong>{selectedCharge.client_name}</strong> — Valor: <strong>{formatCurrency(selectedCharge.final_amount)}</strong>
+          </p>
+          <form onSubmit={handlePaymentSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1.5rem' }}>
+            <Input
+              label="Data do Pagamento"
+              type="date"
+              value={paymentForm.payment_date}
+              onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })}
+            />
+            <Input
+              label="Valor Efetivamente Pago"
+              type="number"
+              step="0.01"
+              value={paymentForm.paid_amount}
+              onChange={(e) => setPaymentForm({ ...paymentForm, paid_amount: e.target.value })}
+              placeholder={String(selectedCharge.final_amount)}
+            />
+            <Input
+              label="Juros no Pagamento"
+              type="number"
+              step="0.01"
+              value={paymentForm.paid_interest}
+              onChange={(e) => setPaymentForm({ ...paymentForm, paid_interest: e.target.value })}
+              placeholder={String(selectedCharge.interest_amount || 0)}
+            />
+            <div style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <Button variant="secondary" type="button" onClick={() => setSelectedCharge(null)}>
+                Cancelar
+              </Button>
+              <Button variant="primary" type="submit" loading={paymentLoading}>
+                Salvar Pagamento
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando dados...</div>
+          <Loading message="Carregando cobranças..." />
+        ) : charges.length === 0 ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <p style={{ marginTop: 0 }}>Nenhuma cobrança encontrada.</p>
+            <Link href="/dashboard/create" style={{ textDecoration: 'none' }}>
+              <Button variant="primary" size="sm">Criar primeira cobrança</Button>
+            </Link>
+          </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
-              <tr>
-                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Cliente</th>
-                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Vencimento</th>
-                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Status</th>
-                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Original</th>
-                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Valor Atualizado</th>
-                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {charges.length === 0 ? (
+          <div style={{ overflow: 'x auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
                 <tr>
-                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma cobrança encontrada.</td>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Cliente</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Descrição</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Vencimento</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Status</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Original</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Atualizado</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Ações</th>
                 </tr>
-              ) : charges.map(charge => (
-                <tr key={charge.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '1rem 1.5rem', fontWeight: 500 }}>{charge.client_name}</td>
-                  <td style={{ padding: '1rem 1.5rem' }}>{new Date(charge.due_date).toLocaleDateString('pt-BR')}</td>
-                  <td style={{ padding: '1rem 1.5rem' }}>{getStatusBadge(charge.status)}</td>
-                  <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)' }}>{formatCurrency(charge.original_amount)}</td>
-                  <td style={{ padding: '1rem 1.5rem', color: charge.final_amount > charge.original_amount ? 'var(--warning)' : 'inherit' }}>
-                    {formatCurrency(charge.final_amount)}
-                  </td>
-                  <td style={{ padding: '1rem 1.5rem' }}>
-                    <button
-                      type="button"
-                      className="btn"
-                      style={{ background: 'var(--primary-glow)', color: 'var(--primary)', padding: '0.45rem 0.8rem' }}
-                      onClick={() => setSelectedCharge(charge)}
-                      disabled={charge.status === 'paga'}
-                    >
-                      {charge.status === 'paga' ? 'Paga' : 'Registrar pagamento'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {charges.map(charge => (
+                  <tr key={charge.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '1rem 1.5rem', fontWeight: 500 }}>{charge.client_name}</td>
+                    <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>{charge.description}</td>
+                    <td style={{ padding: '1rem 1.5rem' }}>{new Date(charge.due_date).toLocaleDateString('pt-BR')}</td>
+                    <td style={{ padding: '1rem 1.5rem' }}>{getStatusBadge(charge.status)}</td>
+                    <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)' }}>{formatCurrency(charge.original_amount)}</td>
+                    <td style={{ padding: '1rem 1.5rem', color: charge.final_amount > charge.original_amount ? 'var(--warning)' : 'inherit', fontWeight: 500 }}>
+                      {formatCurrency(charge.final_amount)}
+                    </td>
+                    <td style={{ padding: '1rem 1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <Link href={`/dashboard/${charge.id}/edit`} style={{ textDecoration: 'none' }}>
+                        <Button size="sm" variant="secondary">Editar</Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => setSelectedCharge(charge)}
+                        disabled={charge.status === 'paga'}
+                      >
+                        {charge.status === 'paga' ? 'Pago' : 'Pagamento'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
+      </Card>
     </>
   );
 }
