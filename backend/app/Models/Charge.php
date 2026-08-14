@@ -10,6 +10,15 @@ class Charge extends Model
 {
     use HasFactory;
 
+    /**
+     * Regra de negócio adotada: juros compostos.
+     *
+     * Valor atualizado = valor_original × (1 + taxa_mensal)^(dias_em_atraso / 30)
+     *
+     * A taxa mensal é armazenada em percentual, por exemplo 2.5 para 2,5% ao mês.
+     * O cálculo é executado no backend para garantir consistência em listagens,
+     * telas e relatórios.
+     */
     protected $fillable = [
         'client_name',
         'description',
@@ -35,10 +44,25 @@ class Charge extends Model
 
     protected $appends = ['final_amount', 'interest_amount'];
 
+    public static function calculateUpdatedAmount(float|int $originalAmount, float|int $monthlyRatePercent, int $daysLate): float
+    {
+        if ($daysLate <= 0 || $originalAmount <= 0) {
+            return (float) $originalAmount;
+        }
+
+        $monthlyRate = (float) $monthlyRatePercent / 100;
+
+        return round((float) $originalAmount * pow(1 + $monthlyRate, $daysLate / 30), 2);
+    }
+
     public function getInterestAmountAttribute(): float
     {
-        if (! $this->due_date || in_array($this->status, ['paga', 'cancelada'], true)) {
+        if (! $this->due_date || $this->status === 'cancelada') {
             return 0.0;
+        }
+
+        if ($this->status === 'paga' && $this->paid_interest !== null) {
+            return (float) $this->paid_interest;
         }
 
         $dueDate = Carbon::parse($this->due_date);
@@ -49,18 +73,30 @@ class Charge extends Model
         }
 
         $daysLate = max(0, $dueDate->diffInDays($now));
-        $monthlyRate = (float) $this->interest_rate / 100;
-        $factor = pow(1 + $monthlyRate, $daysLate / 30);
+        $updatedAmount = self::calculateUpdatedAmount($this->original_amount, $this->interest_rate, $daysLate);
 
-        return round((float) $this->original_amount * ($factor - 1), 2);
+        return round($updatedAmount - (float) $this->original_amount, 2);
     }
 
     public function getFinalAmountAttribute(): float
     {
-        if ($this->status === 'paga' || $this->status === 'cancelada' || ! $this->due_date) {
+        if ($this->status === 'cancelada' || ! $this->due_date) {
             return (float) $this->original_amount;
         }
 
-        return round((float) $this->original_amount + $this->interest_amount, 2);
+        if ($this->status === 'paga') {
+            return $this->paid_amount !== null ? (float) $this->paid_amount : (float) $this->original_amount;
+        }
+
+        $dueDate = Carbon::parse($this->due_date);
+        $now = Carbon::now();
+
+        if ($now->lessThanOrEqualTo($dueDate)) {
+            return (float) $this->original_amount;
+        }
+
+        $daysLate = max(0, $dueDate->diffInDays($now));
+
+        return self::calculateUpdatedAmount($this->original_amount, $this->interest_rate, $daysLate);
     }
 }

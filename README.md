@@ -125,11 +125,13 @@ O candidato poderá escolher entre juros simples ou juros compostos, desde que:
 * O resultado seja consistente em todas as telas e relatórios
 * O valor calculado não precise obrigatoriamente ser salvo no banco de dados
 
-Exemplo utilizando juros compostos:
+Regra adotada: juros compostos.
 
 ```text
 valor_atualizado = valor_original × (1 + taxa_mensal) ^ (dias_em_atraso / 30)
 ```
+
+A implementação foi feita no backend, centralizando o cálculo em [backend/app/Models/Charge.php](backend/app/Models/Charge.php), e os valores calculados são usados de forma consistente em listagens, relatórios e no registro de pagamento.
 
 Ao registrar o pagamento, o sistema deverá armazenar:
 

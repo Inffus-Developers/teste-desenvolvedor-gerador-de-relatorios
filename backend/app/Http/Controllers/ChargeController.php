@@ -120,14 +120,49 @@ class ChargeController extends Controller
             $charges->where('client_name', 'like', "%{$request->client}%");
         }
 
+        $period = $request->input('period', 'issue_date');
+        $allowedPeriods = ['issue_date', 'due_date', 'payment_date'];
+
+        if (! in_array($period, $allowedPeriods, true)) {
+            $period = 'issue_date';
+        }
+
         if ($request->filled('start_date')) {
-            $charges->whereDate('issue_date', '>=', $request->start_date);
+            $charges->whereDate($period, '>=', $request->start_date);
         }
 
         if ($request->filled('end_date')) {
-            $charges->whereDate('issue_date', '<=', $request->end_date);
+            $charges->whereDate($period, '<=', $request->end_date);
         }
 
-        return response()->json($charges->orderByDesc('issue_date')->paginate(500));
+        $page = $request->input('page', 1);
+        $perPage = $request->input('per_page', 15);
+        $items = $charges->orderByDesc($period)->paginate($perPage, ['*'], 'page', $page);
+
+        $totals = [
+            'count' => (int) $items->total(),
+            'total_original' => (float) (float) $items->sum('original_amount'),
+            'total_interest' => (float) $items->sum(function ($charge) {
+                return (float) ($charge->interest_amount ?? 0);
+            }),
+            'total_updated' => (float) $items->sum(function ($charge) {
+                return (float) ($charge->final_amount ?? $charge->original_amount);
+            }),
+            'total_received' => (float) $items->sum('paid_amount'),
+            'total_pending' => (float) $items->sum(function ($charge) {
+                return $charge->status === 'paga' ? 0 : (float) ($charge->final_amount ?? $charge->original_amount);
+            }),
+        ];
+
+        return response()->json([
+            'data' => $items->items(),
+            'pagination' => [
+                'current_page' => $items->currentPage(),
+                'last_page' => $items->lastPage(),
+                'per_page' => $items->perPage(),
+                'total' => $items->total(),
+            ],
+            'totals' => $totals,
+        ]);
     }
 }

@@ -7,15 +7,25 @@ import Link from 'next/link';
 interface Charge {
   id: number;
   client_name: string;
+  description: string;
   original_amount: number;
   final_amount: number;
+  interest_amount: number;
   due_date: string;
   status: string;
+  paid_amount?: number | null;
+  paid_interest?: number | null;
 }
 
 export default function Dashboard() {
   const [charges, setCharges] = useState<Charge[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCharge, setSelectedCharge] = useState<Charge | null>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    payment_date: '',
+    paid_amount: '',
+    paid_interest: '',
+  });
 
   useEffect(() => {
     fetchCharges();
@@ -24,7 +34,7 @@ export default function Dashboard() {
   const fetchCharges = async () => {
     try {
       const res = await api.get('/charges');
-      setCharges(res.data.data); // data.data due to pagination
+      setCharges(res.data.data ?? res.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -42,7 +52,28 @@ export default function Dashboard() {
   };
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val || 0));
+  };
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCharge) return;
+
+    try {
+      await api.post(`/charges/${selectedCharge.id}/pay`, {
+        payment_date: paymentForm.payment_date || undefined,
+        paid_amount: paymentForm.paid_amount ? Number(paymentForm.paid_amount) : undefined,
+        paid_interest: paymentForm.paid_interest ? Number(paymentForm.paid_interest) : undefined,
+      });
+
+      setSelectedCharge(null);
+      setPaymentForm({ payment_date: '', paid_amount: '', paid_interest: '' });
+      await fetchCharges();
+      alert('Pagamento registrado com sucesso!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao registrar pagamento.');
+    }
   };
 
   return (
@@ -57,6 +88,33 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {selectedCharge && (
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <h3 style={{ marginTop: 0 }}>Registrar pagamento</h3>
+          <p style={{ color: 'var(--text-muted)' }}>
+            {selectedCharge.client_name} — {formatCurrency(selectedCharge.final_amount)}
+          </p>
+          <form onSubmit={handlePaymentSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem' }}>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Data do pagamento</label>
+              <input type="date" className="input-field" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} />
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Valor efetivamente pago</label>
+              <input type="number" step="0.01" className="input-field" value={paymentForm.paid_amount} onChange={(e) => setPaymentForm({ ...paymentForm, paid_amount: e.target.value })} placeholder={String(selectedCharge.final_amount)} />
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Juros no pagamento</label>
+              <input type="number" step="0.01" className="input-field" value={paymentForm.paid_interest} onChange={(e) => setPaymentForm({ ...paymentForm, paid_interest: e.target.value })} placeholder={String(selectedCharge.interest_amount || 0)} />
+            </div>
+            <div style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button type="button" className="btn" onClick={() => setSelectedCharge(null)} style={{ background: 'var(--surface-hover)' }}>Cancelar</button>
+              <button type="submit" className="btn btn-primary">Salvar pagamento</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <div className="card mt-4" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando dados...</div>
@@ -67,14 +125,15 @@ export default function Dashboard() {
                 <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Cliente</th>
                 <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Vencimento</th>
                 <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Status</th>
-                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Valor Original</th>
-                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Valor Final</th>
+                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Original</th>
+                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Valor Atualizado</th>
+                <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Ações</th>
               </tr>
             </thead>
             <tbody>
               {charges.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma cobrança encontrada.</td>
+                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma cobrança encontrada.</td>
                 </tr>
               ) : charges.map(charge => (
                 <tr key={charge.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -84,6 +143,17 @@ export default function Dashboard() {
                   <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)' }}>{formatCurrency(charge.original_amount)}</td>
                   <td style={{ padding: '1rem 1.5rem', color: charge.final_amount > charge.original_amount ? 'var(--warning)' : 'inherit' }}>
                     {formatCurrency(charge.final_amount)}
+                  </td>
+                  <td style={{ padding: '1rem 1.5rem' }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ background: 'var(--primary-glow)', color: 'var(--primary)', padding: '0.45rem 0.8rem' }}
+                      onClick={() => setSelectedCharge(charge)}
+                      disabled={charge.status === 'paga'}
+                    >
+                      {charge.status === 'paga' ? 'Paga' : 'Registrar pagamento'}
+                    </button>
                   </td>
                 </tr>
               ))}
