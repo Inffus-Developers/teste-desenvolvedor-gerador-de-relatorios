@@ -73,13 +73,11 @@ export default function Navbar() {
 
         {/* Menu Desktop */}
         <div
+          className="navbar-desktop"
           style={{
             display: 'flex',
             gap: '2rem',
             alignItems: 'center',
-            '@media (max-width: 768px)': {
-              display: 'none',
-            },
           }}
         >
           {navItems.map((item) => (
@@ -125,17 +123,14 @@ export default function Navbar() {
 
           {/* Menu Mobile Button */}
           <button
+            className="navbar-mobile-toggle"
             onClick={() => setMenuOpen(!menuOpen)}
             style={{
-              display: 'none',
               background: 'none',
               border: 'none',
               color: 'var(--text)',
               fontSize: '1.5rem',
               cursor: 'pointer',
-              '@media (max-width: 768px)': {
-                display: 'block',
-              },
             }}
           >
             ☰
@@ -146,13 +141,9 @@ export default function Navbar() {
       {/* Menu Mobile */}
       {menuOpen && (
         <div
+          className="navbar-mobile-menu"
           style={{
-            display: 'none',
             borderTop: '1px solid var(--border)',
-            '@media (max-width: 768px)': {
-              display: 'block',
-              padding: '1rem',
-            },
           }}
         >
           {navItems.map((item) => (

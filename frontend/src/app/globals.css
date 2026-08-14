@@ -168,3 +168,10 @@ h2 { font-size: 1.75rem; margin-bottom: 1rem; }
 .mt-4 { margin-top: 1rem; }
 .mb-4 { margin-bottom: 1rem; }
 .text-center { text-align: center; }
+ .navbar-mobile-toggle, .navbar-mobile-menu { display: none; }
+
+@media (max-width: 768px) {
+  .navbar-desktop { display: none !important; }
+  .navbar-mobile-toggle { display: block; }
+  .navbar-mobile-menu { display: block; padding: 1rem; }
+}

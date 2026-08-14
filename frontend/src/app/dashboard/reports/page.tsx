@@ -2,470 +2,83 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { ExportService } from '@/lib/export';
 import { useToast } from '@/contexts/ToastContext';
 import { Button, Loading } from '@/components';
 
-interface ReportData {
-  id: number;
-  client_name: string;
-  description: string;
-  issue_date: string;
-  due_date: string;
-  payment_date?: string | null;
-  status: string;
-  original_amount: number;
-  interest_amount: number;
-  final_amount: number;
-  paid_amount?: number | null;
-}
+interface ReportData { id: number; client_name: string; description: string; issue_date: string; due_date: string; status: string; original_amount: number; interest_amount: number; final_amount: number; paid_amount?: number | null; }
+interface Totals { count: number; total_original: number; total_interest: number; total_updated: number; total_received: number; total_pending: number; }
+type ExportFormat = 'csv' | 'pdf';
 
-interface Totals {
-  count: number;
-  total_original: number;
-  total_interest: number;
-  total_updated: number;
-  total_received: number;
-  total_pending: number;
-}
+const emptyTotals: Totals = { count: 0, total_original: 0, total_interest: 0, total_updated: 0, total_received: 0, total_pending: 0 };
 
 export default function Reports() {
   const { addToast } = useToast();
   const [data, setData] = useState<ReportData[]>([]);
-  const [totals, setTotals] = useState<Totals>({
-    count: 0, total_original: 0, total_interest: 0, total_updated: 0, total_received: 0, total_pending: 0,
-  });
-  const [loading, setLoading] = useState(false);
+  const [totals, setTotals] = useState<Totals>(emptyTotals);
+  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [sortKey, setSortKey] = useState<string>('');
+  const [sortKey, setSortKey] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [filters, setFilters] = useState({
-    start_date: '',
-    end_date: '',
-    client: '',
-    status: '',
-    period: 'issue_date',
-  });
+  const [filters, setFilters] = useState({ start_date: '', end_date: '', client: '', status: '', period: 'issue_date' });
 
-  const fetchReports = async (pageToFetch: number, nextFilters = filters) => {
+  const queryString = (pageToFetch?: number) => {
+    const params = new URLSearchParams();
+    if (pageToFetch) params.set('page', String(pageToFetch));
+    if (filters.start_date) params.set('start_date', filters.start_date);
+    if (filters.end_date) params.set('end_date', filters.end_date);
+    if (filters.client) params.set('client', filters.client);
+    if (filters.status) params.set('status', filters.status);
+    params.set('period', filters.period);
+    if (sortKey) { params.set('sort', sortKey); params.set('order', sortOrder); }
+    return params.toString();
+  };
+
+  const fetchReports = async (pageToFetch: number) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(pageToFetch) });
-      if (nextFilters.start_date) params.set('start_date', nextFilters.start_date);
-      if (nextFilters.end_date) params.set('end_date', nextFilters.end_date);
-      if (nextFilters.client) params.set('client', nextFilters.client);
-      if (nextFilters.status) params.set('status', nextFilters.status);
-      if (nextFilters.period) params.set('period', nextFilters.period);
-      if (sortKey) params.set('sort', sortKey);
-      if (sortKey && sortOrder) params.set('order', sortOrder);
-
-      const res = await api.get(`/report/charges?${params.toString()}`);
-      setData(res.data.data ?? []);
-      setTotals(res.data.totals ?? { count: 0, total_original: 0, total_interest: 0, total_updated: 0, total_received: 0, total_pending: 0 });
-      setTotalPages(res.data.pagination?.last_page ?? 1);
-    } catch (err) {
-      console.error(err);
+      const response = await api.get(`/report/charges?${queryString(pageToFetch)}`);
+      setData(response.data.data ?? []);
+      setTotals(response.data.totals ?? emptyTotals);
+      setTotalPages(response.data.pagination?.last_page ?? 1);
+    } catch (error) {
+      console.error(error);
       addToast('Erro ao carregar relatório', 'error', 'Erro');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchReports(page);
-  }, [page, sortKey, sortOrder]);
+  useEffect(() => { void fetchReports(page); }, [page, sortKey, sortOrder]);
 
-  const handleFilterSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    setSortKey('');
-    setSortOrder('asc');
-    fetchReports(1, filters);
-  };
-
-  const handleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortOrder('asc');
-    }
-    setPage(1);
-  };
-
-  const handleExportCSV = async () => {
+  const submitFilters = (event: React.FormEvent) => { event.preventDefault(); setPage(1); void fetchReports(1); };
+  const sort = (key: string) => { if (sortKey === key) setSortOrder((current) => current === 'asc' ? 'desc' : 'asc'); else { setSortKey(key); setSortOrder('asc'); } setPage(1); };
+  const exportReport = async (format: ExportFormat) => {
     setExporting(true);
     try {
-      const exportData = data.map((item) => ({
-        Cliente: item.client_name,
-        Descrição: item.description,
-        Emissão: ExportService.formatDate(item.issue_date),
-        Vencimento: ExportService.formatDate(item.due_date),
-        Status: item.status,
-        'Valor Original': item.original_amount,
-        Juros: item.interest_amount,
-        'Valor Atualizado': item.final_amount,
-        'Valor Pago': item.paid_amount ?? 0,
-      }));
-
-      ExportService.exportToCSV(
-        exportData,
-        `relatorio-faturamento-${new Date().toISOString().split('T')[0]}.csv`
-      );
-      addToast('Relatório exportado em CSV com sucesso!', 'success', 'Sucesso');
-    } catch (error: any) {
-      addToast('Erro ao exportar CSV', 'error', 'Erro');
-      console.error(error);
-    } finally {
-      setExporting(false);
-    }
+      const response = await api.get(`/report/charges/export/${format}?${queryString()}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a'); link.href = url; link.download = `relatorio-faturamento.${format}`; link.click(); URL.revokeObjectURL(url);
+      addToast(`Relatório exportado em ${format.toUpperCase()} com sucesso!`, 'success', 'Sucesso');
+    } catch (error) { console.error(error); addToast(`Erro ao exportar ${format.toUpperCase()}`, 'error', 'Erro'); }
+    finally { setExporting(false); }
   };
+  const currency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
+  const date = (value: string) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('pt-BR') : '-';
 
-  const handleExportPDF = async () => {
-    setExporting(true);
-    try {
-      const exportData = data.map((item) => ({
-        Cliente: item.client_name,
-        Descrição: item.description,
-        Emissão: ExportService.formatDate(item.issue_date),
-        Vencimento: ExportService.formatDate(item.due_date),
-        Status: item.status,
-        'Valor Original': ExportService.formatCurrency(item.original_amount),
-        Juros: ExportService.formatCurrency(item.interest_amount),
-        'Valor Atualizado': ExportService.formatCurrency(item.final_amount),
-        'Valor Pago': ExportService.formatCurrency(item.paid_amount ?? 0),
-      }));
-
-      await ExportService.exportToPDF(
-        exportData,
-        `relatorio-faturamento-${new Date().toISOString().split('T')[0]}.pdf`,
-        'Relatório de Faturamento'
-      );
-      addToast('Relatório exportado em PDF com sucesso!', 'success', 'Sucesso');
-    } catch (error: any) {
-      addToast('Erro ao exportar PDF - certifique-se de ter jsPDF instalado', 'error', 'Erro');
-      console.error(error);
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val || 0));
-  };
-
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      pendente: '#f97316',
-      paga: '#22c55e',
-      atrasada: '#dc2626',
-      cancelada: '#6b7280',
-    };
-    return (
-      <span style={{
-        padding: '0.25rem 0.75rem',
-        borderRadius: '0.25rem',
-        backgroundColor: colors[status] + '20',
-        color: colors[status],
-        fontSize: '0.875rem',
-        fontWeight: 500,
-      }}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    );
-  };
-
-  return (
-    <div className="animate-fade-in">
-      <h1 style={{ marginBottom: '0.25rem' }}>Relatório de Faturamento</h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-        Filtros por período, cliente, status e base de cálculo com opções de exportação.
-      </p>
-
-      <form className="card" style={{ marginBottom: '2rem', display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '1rem' }} onSubmit={handleFilterSubmit}>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Data inicial</label>
-          <input type="date" className="input-field" value={filters.start_date} onChange={(e) => setFilters({ ...filters, start_date: e.target.value })} />
-        </div>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Data final</label>
-          <input type="date" className="input-field" value={filters.end_date} onChange={(e) => setFilters({ ...filters, end_date: e.target.value })} />
-        </div>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Cliente</label>
-          <input type="text" className="input-field" value={filters.client} onChange={(e) => setFilters({ ...filters, client: e.target.value })} placeholder="Nome do cliente" />
-        </div>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Status</label>
-          <select className="input-field" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-            <option value="">Todos</option>
-            <option value="pendente">Pendente</option>
-            <option value="paga">Paga</option>
-            <option value="atrasada">Atrasada</option>
-            <option value="cancelada">Cancelada</option>
-          </select>
-        </div>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Base do período</label>
-          <select className="input-field" value={filters.period} onChange={(e) => setFilters({ ...filters, period: e.target.value })}>
-            <option value="issue_date">Data de emissão</option>
-            <option value="due_date">Data de vencimento</option>
-            <option value="payment_date">Data de pagamento</option>
-          </select>
-        </div>
-        <div style={{ gridColumn: 'span 5', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-          <Button type="submit" variant="primary">Aplicar filtros</Button>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <Button variant="secondary" size="sm" onClick={handleExportCSV} loading={exporting}>
-              📥 CSV
-            </Button>
-            <Button variant="secondary" size="sm" onClick={handleExportPDF} loading={exporting}>
-              📄 PDF
-            </Button>
-          </div>
-        </div>
-      </form>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Quantidade</p>
-          <h2 style={{ margin: '0.5rem 0 0' }}>{totals.count}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Valor Original</p>
-          <h2 style={{ margin: '0.5rem 0 0', color: 'var(--primary)' }}>{formatCurrency(totals.total_original)}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Juros</p>
-          <h2 style={{ margin: '0.5rem 0 0', color: 'var(--warning)' }}>{formatCurrency(totals.total_interest)}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Valor Atualizado</p>
-          <h2 style={{ margin: '0.5rem 0 0' }}>{formatCurrency(totals.total_updated)}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Total Recebido</p>
-          <h2 style={{ margin: '0.5rem 0 0', color: 'var(--success)' }}>{formatCurrency(totals.total_received)}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Total Pendente</p>
-          <h2 style={{ margin: '0.5rem 0 0', color: 'var(--danger)' }}>{formatCurrency(totals.total_pending)}</h2>
-        </div>
-      </div>
-
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {loading ? (
-          <Loading message="Gerando relatório..." />
-        ) : (
-          <>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
-                <tr>
-                  <th
-                    onClick={() => handleSort('client_name')}
-                    style={{
-                      padding: '1rem 1.5rem',
-                      fontWeight: 500,
-                      color: sortKey === 'client_name' ? 'var(--primary)' : 'var(--text-muted)',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                    }}
-                  >
-                    Cliente {sortKey === 'client_name' && (sortOrder === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Descrição</th>
-                  <th
-                    onClick={() => handleSort('issue_date')}
-                    style={{
-                      padding: '1rem 1.5rem',
-                      fontWeight: 500,
-                      color: sortKey === 'issue_date' ? 'var(--primary)' : 'var(--text-muted)',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                    }}
-                  >
-                    Emissão {sortKey === 'issue_date' && (sortOrder === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th
-                    onClick={() => handleSort('due_date')}
-                    style={{
-                      padding: '1rem 1.5rem',
-                      fontWeight: 500,
-                      color: sortKey === 'due_date' ? 'var(--primary)' : 'var(--text-muted)',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                    }}
-                  >
-                    Vencimento {sortKey === 'due_date' && (sortOrder === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Status</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)', textAlign: 'right' }}>Original</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)', textAlign: 'right' }}>Juros</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)', textAlign: 'right' }}>Atualizado</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)', textAlign: 'right' }}>Pago</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma cobrança encontrada para os filtros selecionados.</td>
-                  </tr>
-                ) : data.map(item => (
-                  <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{item.client_name}</td>
-                    <td style={{ padding: '0.75rem 1.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>{item.description}</td>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{item.issue_date ? new Date(item.issue_date).toLocaleDateString('pt-BR') : '-'}</td>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{item.due_date ? new Date(item.due_date).toLocaleDateString('pt-BR') : '-'}</td>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{getStatusBadge(item.status)}</td>
-                    <td style={{ padding: '0.75rem 1.5rem', textAlign: 'right' }}>{formatCurrency(item.original_amount)}</td>
-                    <td style={{ padding: '0.75rem 1.5rem', color: 'var(--warning)', textAlign: 'right' }}>{formatCurrency(item.interest_amount)}</td>
-                    <td style={{ padding: '0.75rem 1.5rem', color: 'var(--primary)', fontWeight: 500, textAlign: 'right' }}>{formatCurrency(item.final_amount)}</td>
-                    <td style={{ padding: '0.75rem 1.5rem', textAlign: 'right' }}>{formatCurrency(item.paid_amount ?? 0)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)' }}>
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="btn" style={{ backgroundColor: 'var(--surface-hover)' }}>
-                ← Anterior
-              </button>
-              <span style={{ color: 'var(--text-muted)' }}>Página {page} de {totalPages}</span>
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn" style={{ backgroundColor: 'var(--surface-hover)' }}>
-                Próxima →
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
+  return <div className="animate-fade-in">
+    <h1 style={{ marginBottom: '0.25rem' }}>Relatório de Faturamento</h1>
+    <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Filtros, ordenação, paginação e exportação pelo servidor.</p>
+    <form className="card" style={{ marginBottom: '2rem', display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '1rem' }} onSubmit={submitFilters}>
+      <Field label="Data inicial"><input type="date" className="input-field" value={filters.start_date} onChange={(event) => setFilters({ ...filters, start_date: event.target.value })} /></Field>
+      <Field label="Data final"><input type="date" className="input-field" value={filters.end_date} onChange={(event) => setFilters({ ...filters, end_date: event.target.value })} /></Field>
+      <Field label="Cliente"><input className="input-field" value={filters.client} onChange={(event) => setFilters({ ...filters, client: event.target.value })} placeholder="Nome do cliente" /></Field>
+      <Field label="Status"><select className="input-field" value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">Todos</option><option value="pendente">Pendente</option><option value="paga">Paga</option><option value="atrasada">Atrasada</option><option value="cancelada">Cancelada</option></select></Field>
+      <Field label="Base do período"><select className="input-field" value={filters.period} onChange={(event) => setFilters({ ...filters, period: event.target.value })}><option value="issue_date">Emissão</option><option value="due_date">Vencimento</option><option value="payment_date">Pagamento</option></select></Field>
+      <div style={{ gridColumn: 'span 5', display: 'flex', justifyContent: 'space-between' }}><Button type="submit">Aplicar filtros</Button><div style={{ display: 'flex', gap: '0.5rem' }}><Button type="button" variant="secondary" size="sm" loading={exporting} onClick={() => void exportReport('csv')}>CSV</Button><Button type="button" variant="secondary" size="sm" loading={exporting} onClick={() => void exportReport('pdf')}>PDF</Button></div></div>
+    </form>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem', marginBottom: '2rem' }}>{Object.entries({ Quantidade: totals.count, 'Valor original': currency(totals.total_original), Juros: currency(totals.total_interest), 'Valor atualizado': currency(totals.total_updated), 'Total recebido': currency(totals.total_received), 'Total pendente': currency(totals.total_pending) }).map(([label, value]) => <div className="card" key={label}><p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{label}</p><h2 style={{ margin: '0.5rem 0 0' }}>{value}</h2></div>)}</div>
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>{loading ? <Loading message="Gerando relatório..." /> : <><table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}><thead><tr>{[['Cliente', 'client_name'], ['Descrição', 'description'], ['Emissão', 'issue_date'], ['Vencimento', 'due_date'], ['Status', 'status'], ['Original', 'original_amount']].map(([label, key]) => <th key={key} onClick={() => sort(key)} style={{ padding: '1rem', cursor: 'pointer' }}>{label}{sortKey === key ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}</th>)}<th>Juros</th><th>Atualizado</th><th>Pago</th></tr></thead><tbody>{data.length === 0 ? <tr><td colSpan={9} style={{ padding: '2rem', textAlign: 'center' }}>Nenhuma cobrança encontrada.</td></tr> : data.map((item) => <tr key={item.id}><td>{item.client_name}</td><td>{item.description}</td><td>{date(item.issue_date)}</td><td>{date(item.due_date)}</td><td>{item.status}</td><td>{currency(item.original_amount)}</td><td>{currency(item.interest_amount)}</td><td>{currency(item.final_amount)}</td><td>{currency(item.paid_amount ?? 0)}</td></tr>)}</tbody></table><div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between' }}><Button type="button" variant="secondary" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>Anterior</Button><span>Página {page} de {totalPages}</span><Button type="button" variant="secondary" disabled={page === totalPages} onClick={() => setPage((current) => current + 1)}>Próxima</Button></div></>}</div>
+  </div>;
 }
 
-  return (
-    <div className="animate-fade-in">
-      <h1 style={{ marginBottom: '0.25rem' }}>Relatório de Faturamento</h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-        Filtros por período, cliente, status e base de cálculo.
-      </p>
-
-      <form className="card" style={{ marginBottom: '2rem', display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '1rem' }} onSubmit={handleFilterSubmit}>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Data inicial</label>
-          <input type="date" className="input-field" value={filters.start_date} onChange={(e) => setFilters({ ...filters, start_date: e.target.value })} />
-        </div>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Data final</label>
-          <input type="date" className="input-field" value={filters.end_date} onChange={(e) => setFilters({ ...filters, end_date: e.target.value })} />
-        </div>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Cliente</label>
-          <input type="text" className="input-field" value={filters.client} onChange={(e) => setFilters({ ...filters, client: e.target.value })} placeholder="Nome do cliente" />
-        </div>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Status</label>
-          <select className="input-field" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-            <option value="">Todos</option>
-            <option value="pendente">Pendente</option>
-            <option value="paga">Paga</option>
-            <option value="atrasada">Atrasada</option>
-            <option value="cancelada">Cancelada</option>
-          </select>
-        </div>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">Base do período</label>
-          <select className="input-field" value={filters.period} onChange={(e) => setFilters({ ...filters, period: e.target.value })}>
-            <option value="issue_date">Data de emissão</option>
-            <option value="due_date">Data de vencimento</option>
-            <option value="payment_date">Data de pagamento</option>
-          </select>
-        </div>
-        <div style={{ gridColumn: 'span 5', display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="submit" className="btn btn-primary">Aplicar filtros</button>
-        </div>
-      </form>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Quantidade</p>
-          <h2 style={{ margin: '0.5rem 0 0' }}>{totals.count}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Valor Original</p>
-          <h2 style={{ margin: '0.5rem 0 0', color: 'var(--primary)' }}>{formatCurrency(totals.total_original)}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Juros</p>
-          <h2 style={{ margin: '0.5rem 0 0', color: 'var(--warning)' }}>{formatCurrency(totals.total_interest)}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Valor Atualizado</p>
-          <h2 style={{ margin: '0.5rem 0 0' }}>{formatCurrency(totals.total_updated)}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Total Recebido</p>
-          <h2 style={{ margin: '0.5rem 0 0', color: 'var(--success)' }}>{formatCurrency(totals.total_received)}</h2>
-        </div>
-        <div className="card">
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Total Pendente</p>
-          <h2 style={{ margin: '0.5rem 0 0', color: 'var(--danger)' }}>{formatCurrency(totals.total_pending)}</h2>
-        </div>
-      </div>
-
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Gerando relatório...</div>
-        ) : (
-          <>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
-                <tr>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Cliente</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Descrição</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Emissão</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Vencimento</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Status</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Original</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Juros</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Atualizado</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Pago</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma cobrança encontrada para os filtros selecionados.</td>
-                  </tr>
-                ) : data.map(item => (
-                  <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{item.client_name}</td>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{item.description}</td>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{item.issue_date ? new Date(item.issue_date).toLocaleDateString('pt-BR') : '-'}</td>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{item.due_date ? new Date(item.due_date).toLocaleDateString('pt-BR') : '-'}</td>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{item.status}</td>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{formatCurrency(item.original_amount)}</td>
-                    <td style={{ padding: '0.75rem 1.5rem', color: 'var(--warning)' }}>{formatCurrency(item.interest_amount)}</td>
-                    <td style={{ padding: '0.75rem 1.5rem', color: 'var(--primary)' }}>{formatCurrency(item.final_amount)}</td>
-                    <td style={{ padding: '0.75rem 1.5rem' }}>{formatCurrency(item.paid_amount ?? 0)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)' }}>
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="btn" style={{ backgroundColor: 'var(--surface-hover)' }}>
-                Anterior
-              </button>
-              <span style={{ color: 'var(--text-muted)' }}>Página {page} de {totalPages}</span>
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn" style={{ backgroundColor: 'var(--surface-hover)' }}>
-                Próxima
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="input-group" style={{ marginBottom: 0 }}><label className="input-label">{label}</label>{children}</div>; }

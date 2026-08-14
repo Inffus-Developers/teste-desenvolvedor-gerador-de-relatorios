@@ -1,5 +1,41 @@
 # Teste Técnico — Desenvolvedor Fullstack
 
+## Execução com Docker
+
+Pré-requisito: Docker Desktop em execução. Nenhuma instalação local de PHP, Node.js ou MySQL é necessária.
+
+```bash
+docker compose up --build
+```
+
+Na primeira inicialização, o backend instala as dependências, cria o arquivo `.env` quando necessário, gera a chave da aplicação, executa as migrations e popula dados de demonstração. Acesse o frontend em `http://localhost:3000` e a API em `http://localhost:8000/api`.
+
+Credenciais de demonstração: `admin@admin.com` / `password`.
+
+Para encerrar, use `docker compose down`. Para remover também os dados persistidos do MySQL, use `docker compose down -v`.
+
+## Testes
+
+```bash
+docker compose exec backend php artisan test
+```
+
+Localmente, quando as dependências já estiverem disponíveis, os comandos equivalentes são `cd backend && php artisan test` e `cd frontend && npm run build`.
+
+## API de relatórios
+
+Todas as rotas abaixo exigem token Bearer emitido pelo `POST /api/login`.
+
+| Método | Endpoint | Descrição |
+| --- | --- | --- |
+| `GET` | `/api/report/charges` | Relatório paginado com filtros, ordenação e totalizadores. |
+| `GET` | `/api/report/charges/export/csv` | Exportação CSV em streaming. |
+| `GET` | `/api/report/charges/export/pdf` | Exportação PDF. |
+
+Filtros compartilhados: `start_date`, `end_date`, `client`, `status` e `period` (`issue_date`, `due_date` ou `payment_date`). A listagem também aceita `page`, `per_page`, `sort` e `order` (`asc` ou `desc`).
+
+O CSV processa cobranças com cursor, sem carregar todos os registros em memória. Para relatórios PDF muito grandes, a evolução recomendada é enfileirar a geração e disponibilizar o arquivo em armazenamento externo.
+
 ## Objetivo
 
 Desenvolver uma aplicação simples de faturamento com autenticação e um módulo de relatórios preparado para trabalhar com grandes volumes de dados.

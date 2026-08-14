@@ -48,4 +48,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('charges/{charge}/pay', [ChargeController::class, 'pay']);
     Route::apiResource('clients', ClientController::class);
     Route::get('report/charges', [ChargeController::class, 'report']);
+    Route::get('report/charges/export/{format}', [ChargeController::class, 'export'])
+        ->whereIn('format', ['csv', 'pdf']);
 });
