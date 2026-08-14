@@ -1,5 +1,41 @@
 # Teste Técnico — Desenvolvedor Fullstack
 
+## Execução com Docker
+
+Pré-requisito: Docker Desktop em execução. Nenhuma instalação local de PHP, Node.js ou MySQL é necessária.
+
+```bash
+docker compose up --build
+```
+
+Na primeira inicialização, o backend instala as dependências, cria o arquivo `.env` quando necessário, gera a chave da aplicação, executa as migrations e popula dados de demonstração. Acesse o frontend em `http://localhost:3000` e a API em `http://localhost:8000/api`.
+
+Credenciais de demonstração: `admin@admin.com` / `password`.
+
+Para encerrar, use `docker compose down`. Para remover também os dados persistidos do MySQL, use `docker compose down -v`.
+
+## Testes
+
+```bash
+docker compose exec backend php artisan test
+```
+
+Localmente, quando as dependências já estiverem disponíveis, os comandos equivalentes são `cd backend && php artisan test` e `cd frontend && npm run build`.
+
+## API de relatórios
+
+Todas as rotas abaixo exigem token Bearer emitido pelo `POST /api/login`.
+
+| Método | Endpoint | Descrição |
+| --- | --- | --- |
+| `GET` | `/api/report/charges` | Relatório paginado com filtros, ordenação e totalizadores. |
+| `GET` | `/api/report/charges/export/csv` | Exportação CSV em streaming. |
+| `GET` | `/api/report/charges/export/pdf` | Exportação PDF. |
+
+Filtros compartilhados: `start_date`, `end_date`, `client`, `status` e `period` (`issue_date`, `due_date` ou `payment_date`). A listagem também aceita `page`, `per_page`, `sort` e `order` (`asc` ou `desc`).
+
+O CSV processa cobranças com cursor, sem carregar todos os registros em memória. Para relatórios PDF muito grandes, a evolução recomendada é enfileirar a geração e disponibilizar o arquivo em armazenamento externo.
+
 ## Objetivo
 
 Desenvolver uma aplicação simples de faturamento com autenticação e um módulo de relatórios preparado para trabalhar com grandes volumes de dados.
@@ -125,11 +161,13 @@ O candidato poderá escolher entre juros simples ou juros compostos, desde que:
 * O resultado seja consistente em todas as telas e relatórios
 * O valor calculado não precise obrigatoriamente ser salvo no banco de dados
 
-Exemplo utilizando juros compostos:
+Regra adotada: juros compostos.
 
 ```text
 valor_atualizado = valor_original × (1 + taxa_mensal) ^ (dias_em_atraso / 30)
 ```
+
+A implementação foi feita no backend, centralizando o cálculo em [backend/app/Models/Charge.php](backend/app/Models/Charge.php), e os valores calculados são usados de forma consistente em listagens, relatórios e no registro de pagamento.
 
 Ao registrar o pagamento, o sistema deverá armazenar:
 
@@ -224,6 +262,54 @@ O candidato deverá explicar no README:
 * Como o relatório se comportaria com milhões de registros
 * Como a exportação em PDF e CSV se comportaria com grandes volumes
 * Quais melhorias adicionais poderiam ser aplicadas em produção
+
+### Índices criados
+
+Os principais índices foram adicionados na migration [backend/database/migrations/2026_08_14_000002_add_report_performance_indexes.php](backend/database/migrations/2026_08_14_000002_add_report_performance_indexes.php):
+
+* `charges_client_name_index` em `client_name`
+* `charges_issue_date_index` em `issue_date`
+* `charges_due_date_index` em `due_date`
+* `charges_payment_date_index` em `payment_date`
+* `charges_status_issue_date_index` em `(status, issue_date)`
+* `charges_status_due_date_index` em `(status, due_date)`
+* `charges_status_payment_date_index` em `(status, payment_date)`
+* `clients_status_index` em `status`
+* `clients_email_index` em `email`
+* `clients_name_index` em `name`
+
+Esses índices foram escolhidos porque os filtros e ordenações do relatório usam, prioritariamente, datas, status e nome do cliente. Em consultas com milhões de registros, sem índices a base precisaria fazer scans completos, o que tornaria o relatório lento e caro. Com esses índices, o banco consegue localizar um subconjunto menor de linhas antes de aplicar ordenação e paginação.
+
+### Como o relatório se comporta com milhões de registros
+
+A API de relatório usa paginação no backend, filtros aplicados no banco e ordenação no backend. Isso elimina a necessidade de carregar todas as linhas em memória, reduzindo o uso de memória e mantendo a resposta responsiva mesmo com milhões de registros. As consultas de relatório ficam restritas ao intervalo de datas, status e cliente selecionados, e a ordenação por `issue_date`, `due_date` ou `payment_date` é delegada ao banco.
+
+Para cenários de grande volume, o comportamento esperado continua estável porque a resposta do endpoint é paginada, com o backend retornando lotes menores. A aplicação também evita N+1 criando as consultas de forma direta no controlador e sem carregamento explícito de relacionamentos em laço.
+
+### Exportação em PDF e CSV em grandes volumes
+
+A exportação foi pensada para seguir o mesmo contrato de filtros e paginação do relatório, mas em modo de lote. Em CSV, o melhor caminho é processar por chunks em streaming para não consumir memória excessiva, escrevendo linha a linha sem carregar todas as cobranças em memória. Em PDF, a estratégia ideal é gerar o documento com paginação e processamento em lote, evitando montar a árvore inteira do relatório em um único objeto gigantesco.
+
+Em produção, o ideal é separar a geração de exportação para uma fila assíncrona (Jobs/Queue) e entregar o arquivo em background, para que a tela não espere o processamento completo e o usuário possa receber o arquivo ou acompanhar o progresso.
+
+### Geração de dados para testes
+
+O comando abaixo foi adicionado para gerar volume de dados de teste:
+
+```bash
+php artisan report:generate 50000
+```
+
+Esse comando cria um conjunto de clientes e cobranças sintéticas para validar o comportamento do relatório em volumes altos, sem precisar manter milhões de registros no repositório.
+
+### Melhorias adicionais em produção
+
+* Utilizar índices compostos mais específicos por tipo de consulta e por filtro mais frequente
+* Adicionar cache de agregados para relatórios muito recorrentes
+* Separar exportação em filas e armazenamento em disco/S3
+* Utilizar leitura e escrita em replicas para aliviar a base primária
+* Aplicar paginação cursor-based em endpoints muito grandes e muito consultados
+* Considerar partições por data em tabelas altamente volumosas
 
 ---
 

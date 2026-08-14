@@ -1,0 +1,88 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: inffus_backend
+    restart: unless-stopped
+    working_dir: /var/www
+    command: sh -lc "if [ ! -f .env ]; then cp .env.example .env && php artisan key:generate --force; fi; composer install --no-interaction --prefer-dist && php artisan migrate --force && php artisan db:seed --force && php-fpm"
+    volumes:
+      - ./backend:/var/www
+    depends_on:
+      mysql:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=testeinffus
+      - DB_USERNAME=app
+      - DB_PASSWORD=app
+    networks:
+      - inffus_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: inffus_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - backend
+    networks:
+      - inffus_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: inffus_frontend
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -lc "npm ci && npm run dev"
+    environment:
+      - CHOKIDAR_USEPOLLING=1
+      - WATCHPACK_POLLING=true
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - inffus_network
+
+  mysql:
+    image: mysql:8.0
+    container_name: inffus_mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_DATABASE=testeinffus
+      - MYSQL_USER=app
+      - MYSQL_PASSWORD=app
+    volumes:
+      - dbdata:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - inffus_network
+
+networks:
+  inffus_network:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
