@@ -1,0 +1,32 @@
+*.log
+.DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.codex
+/.cursor/
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+# Cache intermediário do scribe:generate, nunca lido em runtime pela rota
+# /docs (essa serve resources/views/scribe/, já commitado). Regenerável a
+# qualquer momento e pode conter o token real usado pelo ResponseCalls nos
+# headers de exemplo capturados — nunca deve ir para o repositório.
+/.scribe
+/storage/*.key
+/storage/pail
+/vendor
+_ide_helper.php
+Homestead.json
+Homestead.yaml
+Thumbs.db
