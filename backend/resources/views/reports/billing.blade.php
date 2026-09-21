@@ -16,11 +16,11 @@ Quantidade: {{ $export->totals['count'] }} · Original: {{ \App\Support\Amount::
 Juros: {{ \App\Support\Amount::format($export->totals['interest']) }} · Atualizado: {{ \App\Support\Amount::format($export->totals['updated_amount']) }} ·
 Recebido: {{ \App\Support\Amount::format($export->totals['received_amount']) }} · Pendente: {{ \App\Support\Amount::format($export->totals['pending_amount']) }}
 </div>
-<table><colgroup><col style="width:28%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:10%"><col style="width:9%"><col style="width:12%"><col style="width:10%"></colgroup><thead><tr><th>Cliente / descrição</th><th>Emissão</th><th>Vencimento</th><th>Pagamento</th><th>Status</th><th>Original</th><th>Juros</th><th>Atualizado</th><th>Pago</th></tr></thead><tbody>
+<table><thead><tr><th style="width:28%">Cliente / descrição</th><th style="width:8%">Emissão</th><th style="width:8%">Vencimento</th><th style="width:8%">Pagamento</th><th style="width:7%">Status</th><th style="width:10%">Original</th><th style="width:9%">Juros</th><th style="width:12%">Atualizado</th><th style="width:10%">Pago</th></tr></thead><tbody>
 @forelse ($rows as $row)
-<tr><td><strong>{{ $row->customer_name }}</strong><br>#{{ $row->charge_id }} · {{ $row->description }}</td>
-<td>{{ $row->issued_at }}</td><td>{{ $row->due_at }}</td><td>{{ $row->paid_at ?? '—' }}</td><td>{{ ['paid' => 'Paga', 'pending' => 'Pendente', 'overdue' => 'Vencida'][$row->status] }}</td>
-@foreach (['original_amount', 'interest', 'updated_amount', 'paid_amount'] as $field)<td class="number">{{ \App\Support\Amount::format($row->$field) }}</td>@endforeach</tr>
+<tr><td style="width:28%"><strong>{{ $row->customer_name }}</strong><br>#{{ $row->charge_id }} · {{ $row->description }}</td>
+<td style="width:8%">{{ $row->issued_at }}</td><td style="width:8%">{{ $row->due_at }}</td><td style="width:8%">{{ $row->paid_at ?? '—' }}</td><td style="width:7%">{{ ['paid' => 'Paga', 'pending' => 'Pendente', 'overdue' => 'Vencida'][$row->status] }}</td>
+@foreach (['original_amount' => 10, 'interest' => 9, 'updated_amount' => 12, 'paid_amount' => 10] as $field => $width)<td style="width:{{ $width }}%" class="number">{{ \App\Support\Amount::format($row->$field) }}</td>@endforeach</tr>
 @empty<tr><td colspan="9">Nenhuma cobrança encontrada para os filtros selecionados.</td></tr>@endforelse
 </tbody></table><p class="meta">Juros simples: valor original × taxa mensal (%) × dias em atraso ÷ 3000. Cobranças pagas mantêm os juros registrados no pagamento.</p>
 </body></html>
