@@ -16,3 +16,7 @@ frontend/coverage/
 .env
 *.log
 artifacts/
+frontend/*.tsbuildinfo
+backend/storage/app/application.key
+frontend/test-results/
+frontend/playwright-report/

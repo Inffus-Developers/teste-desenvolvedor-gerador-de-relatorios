@@ -1,0 +1,16 @@
+name: Verify application
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backend integration tests on MySQL
+        run: docker compose --profile test run --build --rm test
+      - name: Frontend typecheck and production build
+        run: docker compose build frontend
+      - name: Frontend unit tests
+        run: docker run --rm -v "$PWD/frontend:/app" -w /app node:22-alpine sh -c 'corepack enable && corepack prepare pnpm@11.19.0 --activate && pnpm install --frozen-lockfile && pnpm test'
+      - name: Stop services
+        if: always()
+        run: docker compose down -v

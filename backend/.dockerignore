@@ -1,0 +1,12 @@
+vendor
+.env
+.git
+node_modules
+storage/app/private/*
+storage/app/application.key
+storage/logs/*
+storage/framework/cache/*
+storage/framework/views/*
+storage/framework/sessions/*
+bootstrap/cache/*.php
+database/*.sqlite
