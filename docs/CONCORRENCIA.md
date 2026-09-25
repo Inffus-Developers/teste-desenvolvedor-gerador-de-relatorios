@@ -72,7 +72,7 @@ $env:DB_USERNAME = 'clara_test_runner'
 $env:DB_PASSWORD = Read-Host 'Senha do usuário exclusivo de testes' -MaskInput
 $env:DB_URL = ''
 $env:MYSQL_CONCURRENCY_TESTS = '1'
-& ../.tools/php/php.exe vendor/bin/phpunit -c phpunit.mysql.xml
+& ../.tools/php/php.exe vendor/bin/phpunit -c phpunit.mysql.xml --filter ChargeConcurrencyTest
 # Suíte preexistente também executada no mesmo MySQL isolado:
 & ../.tools/php/php.exe artisan test --compact
 ```
@@ -91,7 +91,7 @@ export DB_CONNECTION=mysql DB_DATABASE=clara_test DB_HOST=127.0.0.1 DB_PORT=3310
 export DB_USERNAME=clara_test_runner DB_URL='' MYSQL_CONCURRENCY_TESTS=1
 read -r -s -p 'Senha do usuário exclusivo de testes: ' DB_PASSWORD; printf '\n'
 export DB_PASSWORD
-php vendor/bin/phpunit -c phpunit.mysql.xml
+php vendor/bin/phpunit -c phpunit.mysql.xml --filter ChargeConcurrencyTest
 php artisan test --compact
 unset DB_PASSWORD MYSQL_CONCURRENCY_TESTS
 ```

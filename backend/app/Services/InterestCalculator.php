@@ -12,7 +12,9 @@ final class InterestCalculator
 
     public function calculate(string $amount, string $rate, string $dueAt, string $asOf): string
     {
-        $days = max(0, (int) CarbonImmutable::parse($dueAt)->diffInDays(CarbonImmutable::parse($asOf), false));
+        $dueDate = CarbonImmutable::createFromFormat('!Y-m-d', $dueAt, 'UTC');
+        $referenceDate = CarbonImmutable::createFromFormat('!Y-m-d', $asOf, 'UTC');
+        $days = max(0, (int) $dueDate->diffInDays($referenceDate, false));
 
         return (string) BigDecimal::of($amount)->multipliedBy($rate)->multipliedBy($days)
             ->dividedBy(self::DIVISOR, 2, RoundingMode::HalfUp);
