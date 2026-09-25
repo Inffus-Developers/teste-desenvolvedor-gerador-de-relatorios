@@ -1,451 +1,149 @@
-# Teste Técnico — Desenvolvedor Fullstack
+# Clara · Gestão de faturamento
 
-## Objetivo
+Aplicação do teste técnico fullstack: Laravel 13 / PHP 8.4, React 19 / TypeScript, MySQL 8.4 e Docker Compose. Inclui autenticação por sessão, clientes, cobranças, pagamentos, relatório com totalizadores e exportações assíncronas em CSV e PDF.
 
-Desenvolver uma aplicação simples de faturamento com autenticação e um módulo de relatórios preparado para trabalhar com grandes volumes de dados.
+## Executar com Docker
 
-O objetivo do teste é avaliar organização de código, modelagem de banco de dados, performance, domínio de backend e frontend, aplicação de regras de negócio e capacidade de justificar decisões técnicas.
+Pré-requisito: Docker Desktop **em execução**, com suporte a containers Linux e Docker Compose.
 
----
-
-## Tecnologias obrigatórias
-
-### Backend
-
-* PHP
-* Laravel
-
-### Frontend
-
-* React ou Next.js
-* TypeScript
-
-### Banco de dados
-
-* MySQL
-
-### Infraestrutura
-
-* Docker
-* Docker Compose
-
----
-
-## Contexto do projeto
-
-A aplicação será utilizada para registrar cobranças realizadas para clientes.
-
-Cada cobrança deverá possuir informações como:
-
-* Cliente
-* Descrição
-* Valor original
-* Data de emissão
-* Data de vencimento
-* Data de pagamento
-* Status
-* Taxa de juros
-* Valor final atualizado
-
-O sistema deverá possuir autenticação. Apenas usuários autenticados poderão acessar os registros e os relatórios.
-
----
-
-## Funcionalidades obrigatórias
-
-### 1. Autenticação
-
-O sistema deverá permitir:
-
-* Login
-* Logout
-* Proteção das rotas do sistema
-* Proteção dos endpoints da API
-
-Não é necessário desenvolver cadastro público de usuários.
-
----
-
-### 2. Gestão de clientes
-
-O sistema deverá permitir:
-
-* Cadastrar clientes
-* Editar clientes
-* Listar clientes
-* Visualizar os dados de um cliente
-
-Dados mínimos do cliente:
-
-* Nome
-* Documento
-* E-mail
-* Status
-
----
-
-### 3. Gestão de cobranças
-
-O sistema deverá permitir:
-
-* Cadastrar cobranças
-* Editar cobranças
-* Listar cobranças
-* Visualizar uma cobrança
-* Registrar o pagamento de uma cobrança
-
-Dados mínimos da cobrança:
-
-* Cliente
-* Descrição
-* Valor original
-* Data de emissão
-* Data de vencimento
-* Data de pagamento
-* Taxa de juros mensal
-* Status
-
----
-
-## Regra de negócio — cálculo de juros
-
-Quando uma cobrança estiver vencida e ainda não estiver paga, o sistema deverá calcular seu valor atualizado em tempo real.
-
-O cálculo deverá considerar:
-
-* Valor original
-* Taxa de juros mensal da cobrança
-* Quantidade de dias em atraso
-* Data atual
-
-O candidato poderá escolher entre juros simples ou juros compostos, desde que:
-
-* A regra utilizada esteja documentada
-* O cálculo seja realizado no backend
-* O resultado seja consistente em todas as telas e relatórios
-* O valor calculado não precise obrigatoriamente ser salvo no banco de dados
-
-Exemplo utilizando juros compostos:
-
-```text
-valor_atualizado = valor_original × (1 + taxa_mensal) ^ (dias_em_atraso / 30)
+```sh
+cp .env.example .env
+docker compose up --build -d
 ```
 
-Ao registrar o pagamento, o sistema deverá armazenar:
+No PowerShell, use `Copy-Item .env.example .env` no primeiro comando.
 
-* Data do pagamento
-* Valor efetivamente pago
-* Valor dos juros no momento do pagamento
+Acesse **http://localhost:8080**.
 
----
+| Acesso de demonstração | Valor |
+| --- | --- |
+| E-mail | `admin@clara.local` |
+| Senha | `Clara@2026!` |
 
-## Módulo de relatórios
+O serviço `init` executa migrations e seeders; cria o usuário, oito clientes e quarenta cobranças fictícias. Executá-lo novamente não duplica a demonstração nem redefine senhas. A chave de criptografia é gerada uma vez e persistida no volume de storage. MySQL e arquivos sobrevivem a `docker compose down`.
 
-Desenvolver um relatório de faturamento por período.
-
-O relatório deverá permitir filtros por:
-
-* Data inicial
-* Data final
-* Cliente
-* Status da cobrança
-
-O usuário deverá conseguir escolher se o período será baseado em:
-
-* Data de emissão
-* Data de vencimento
-* Data de pagamento
-
-O relatório deverá exibir:
-
-* Cliente
-* Descrição da cobrança
-* Data de emissão
-* Data de vencimento
-* Status
-* Valor original
-* Juros calculados
-* Valor atualizado
-* Valor pago
-
-Também deverão ser exibidos totalizadores:
-
-* Quantidade de cobranças
-* Valor original total
-* Total de juros
-* Valor atualizado total
-* Valor total recebido
-* Valor total pendente
-
----
-
-## Exportação dos relatórios
-
-O relatório deverá poder ser exportado nos seguintes formatos:
-
-* PDF
-* CSV
-
-As exportações deverão respeitar os filtros aplicados pelo usuário.
-
-O arquivo exportado deverá conter:
-
-* Período selecionado
-* Filtros utilizados
-* Dados do relatório
-* Totalizadores
-
-A solução adotada para geração dos relatórios deverá ser definida pelo candidato.
-
----
-
-## Requisitos de performance
-
-O módulo de relatórios deverá ser projetado considerando tabelas com milhões de registros.
-
-A aplicação não precisa incluir milhões de registros no repositório, mas deverá possuir uma forma de gerar dados para testes.
-
-Requisitos obrigatórios:
-
-* Paginação realizada no backend
-* Filtros realizados no banco de dados
-* Ordenação realizada no backend
-* Não carregar todos os registros em memória
-* Evitar consultas N+1
-* Criar índices adequados no banco de dados
-* Utilizar migrations
-* Disponibilizar factories ou seeders para gerar um volume significativo de dados
-* Garantir que a exportação dos relatórios seja preparada para grandes volumes
-
-O candidato deverá explicar no README:
-
-* Quais índices foram criados
-* Por que esses índices foram escolhidos
-* Como o relatório se comportaria com milhões de registros
-* Como a exportação em PDF e CSV se comportaria com grandes volumes
-* Quais melhorias adicionais poderiam ser aplicadas em produção
-
----
-
-## Frontend
-
-O frontend deverá possuir, no mínimo:
-
-* Tela de login
-* Listagem de clientes
-* Cadastro e edição de clientes
-* Listagem de cobranças
-* Cadastro e edição de cobranças
-* Tela do relatório de faturamento
-* Filtros do relatório
-* Paginação
-* Ordenação
-* Exportação em PDF
-* Exportação em CSV
-* Estados de carregamento
-* Tratamento de erros
-* Feedback de operações realizadas com sucesso
-
-A interface não precisa possuir um design avançado, mas deverá ser organizada, responsiva e componentizada.
-
----
-
-## API
-
-A comunicação entre frontend e backend deverá ocorrer por API.
-
-A API deverá possuir:
-
-* Validação das requisições
-* Respostas HTTP adequadas
-* Tratamento de erros
-* Autenticação
-* Paginação
-* Filtros
-* Ordenação
-* Geração de relatórios em PDF
-* Geração de relatórios em CSV
-
-A estrutura e o padrão dos endpoints ficam a critério do candidato.
-
----
-
-## Dockerização
-
-O projeto deverá ser completamente executável por Docker.
-
-A estrutura deverá incluir, no mínimo:
-
-* Serviço do backend
-* Serviço do frontend
-* Serviço do MySQL
-* Arquivo `docker-compose.yml`
-* Configurações necessárias para comunicação entre os serviços
-* Persistência dos dados do banco
-* Instruções para subir o ambiente
-
-O projeto deverá poder ser iniciado com poucos comandos, sem necessidade de configurar manualmente PHP, Node.js ou MySQL na máquina local.
-
----
-
-## Testes automatizados
-
-O projeto deverá possuir testes automatizados no backend.
-
-Cenários mínimos:
-
-* Usuário não autenticado não acessa o relatório
-* Usuário não autenticado não exporta relatórios
-* Cálculo de juros para cobrança vencida
-* Cobrança paga não continua acumulando juros
-* Filtros do relatório
-* Totalizadores do relatório
-* Registro de pagamento
-* Exportação do relatório em PDF
-* Exportação do relatório em CSV
-
-Testes no frontend serão considerados um diferencial.
-
----
-
-## Uso de inteligência artificial
-
-O uso de ferramentas de inteligência artificial durante o desenvolvimento é permitido, mas não obrigatório.
-
-Caso sejam utilizadas ferramentas de IA, as configurações, instruções ou arquivos utilizados para orientar os agentes deverão ser mantidos dentro do repositório do projeto.
-
-Também será avaliada a forma como o candidato utiliza e configura agentes de IA no processo de desenvolvimento.
-
-Boas práticas no uso serão consideradas de forma positiva.
-
----
-
-## Organização dos commits
-
-O desenvolvimento deverá ser realizado com commits pequenos, semânticos e separados por responsabilidade.
-
-Evite concentrar toda a implementação em poucos commits grandes.
-
-Exemplos:
-
-```text
-feat: add authentication structure
-feat: create customers module
-feat: create billing module
-feat: add overdue interest calculation
-feat: create billing report filters
-feat: add csv report export
-feat: add pdf report export
-test: add billing interest tests
-chore: add docker environment
-docs: update project instructions
+```sh
+docker compose ps
+docker compose logs -f backend worker
+docker compose down
 ```
 
-Os commits também serão considerados durante a avaliação.
+Para aplicar uma nova versão: `docker compose up --build -d`. Não utilize `down -v` se quiser preservar os dados. As credenciais são exclusivamente de demonstração; o ambiente fica exposto somente em `127.0.0.1`. `APP_PORT` permite mudar a porta. Credenciais alternativas do seeder são configuráveis no `.env`.
 
----
+## Testes
 
-## Entrega
+Backend no **MySQL**, em banco separado `clara_test`:
 
-O candidato deverá realizar a entrega seguindo obrigatoriamente este fluxo:
-
-1. Criar um **fork** do repositório disponibilizado para o teste.
-2. Criar uma nova branch dentro do fork utilizando o próprio nome.
-
-Exemplo:
-
-```text
-joao-silva
+```sh
+docker compose --profile test run --build --rm test
 ```
 
-3. Desenvolver toda a solução nessa branch.
-4. Manter o histórico de commits pequenos, semânticos e separados por responsabilidade.
-5. Ao finalizar, abrir um **Pull Request da branch criada no fork para o repositório original do teste**.
+Os testes recriam tabelas. Nunca os execute apontando para dados reais. O banco de testes é provisionado na primeira inicialização do volume MySQL. Em volumes antigos, crie `clara_test` e conceda acesso ao usuário `clara` antes de executar a suíte.
 
-Exemplo do fluxo:
+Frontend, usando apenas Docker:
 
-```text
-fork-do-candidato:joao-silva
-    ↓
-repositorio-original:main
+```sh
+docker run --rm -v "${PWD}/frontend:/app" -w /app node:22-alpine sh -c "corepack enable && corepack prepare pnpm@11.19.0 --activate && pnpm install --frozen-lockfile && pnpm test && pnpm build"
 ```
 
-O Pull Request deverá conter:
+Para desenvolvimento fora do Docker: PHP 8.4 com extensões listadas no Dockerfile, Composer, Node 22 e pnpm 11.19.0. Execute `composer install` no backend, configure `.env`, gere a chave e rode `php artisan migrate --seed`. Inicie `php artisan serve` na porta 8000 e `php artisan queue:work --timeout=3600` em outro terminal. No frontend, execute `pnpm install --frozen-lockfile` e `pnpm dev`. O Vite encaminha `/api` e `/sanctum` para o backend.
 
-* Título claro e objetivo
-* Resumo da solução desenvolvida
-* Instruções para executar o projeto
-* Instruções para executar os testes
-* Explicação das decisões técnicas
-* Explicação da estratégia de performance
-* Explicação da geração dos relatórios
-* Pontos que não foram concluídos, caso existam
+Com a aplicação e o worker ativos, os testes de navegador são reproduzíveis:
 
-O repositório deverá conter:
+```sh
+cd frontend
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
 
-* Código do backend
-* Código do frontend
-* Dockerfiles
-* Arquivo `docker-compose.yml`
-* Migrations
-* Factories e seeders
-* Testes automatizados
-* Arquivo `.env.example`
-* Instruções para executar o projeto
-* Instruções para executar os testes
-* Explicação das decisões técnicas
-* Explicação da estratégia de performance
+O endereço padrão de E2E é `http://127.0.0.1:5173`. Para testar o Compose, defina `E2E_BASE_URL=http://localhost:8080`. Os testes usam as credenciais de demonstração, criam registros identificados como `Teste E2E` e salvam capturas em `artifacts/`, ignorado pelo Git.
 
-Não serão aceitas entregas por arquivo compactado, e-mail, link para outro repositório ou qualquer outro meio externo.
+Os testes cobrem autenticação e acesso negado, CRUD, validação, juros e arredondamento, pagamento e imutabilidade, filtros por todas as datas, totalizadores globais, cursores, ausência de N+1, proteção de downloads, exportação PDF/CSV/ZIP, expiração e limite de exportações. O CI executa backend em MySQL, build TypeScript e testes unitários do frontend.
 
-A entrega deverá ser realizada exclusivamente por meio do Pull Request aberto a partir do fork do candidato para o repositório original disponibilizado para o teste.
+## Regras financeiras
 
----
+- Taxa mensal expressa em **percentual**: `2.0000` significa **2% ao mês**.
+- Juros simples, por dias corridos e mês comercial de 30 dias: `juros = original × taxa_percentual × max(0, dias_atraso) / 3000`.
+- Vencimento no dia atual não gera atraso. O fuso da aplicação é `America/Sao_Paulo`.
+- Juros são arredondados por cobrança, em duas casas, meio para cima. Totalizadores somam valores já arredondados. Exemplo: R$ 1.000,00, taxa 2%, 30 dias → juros R$ 20,00; atualizado R$ 1.020,00.
+- Valores são `DECIMAL` no MySQL; pagamento usa aritmética decimal com Brick Math. O cálculo SQL e o de pagamento possuem testes de equivalência. A apresentação preserva centavos de grandes somas, sem converter as strings decimais para `float`.
+- Status é derivado: `paid` se houve pagamento, `overdue` se em aberto com vencimento anterior à data de referência, `pending` nos demais casos. Não existe uma coluna de status que fique desatualizada à meia-noite.
+- Pagamento registra data, valor efetivamente recebido e juros na **data do pagamento**, inclusive quando retroativo. Não pode preceder a emissão nem estar no futuro.
+- Pagamento quita integralmente a cobrança. Diferenças de valor representam desconto/acréscimo; pagamentos parciais e estornos não fazem parte desta versão. O valor atualizado de uma cobrança paga continua sendo original + juros congelados; o recebido é o valor efetivo e pode ser diferente.
+- Uma cobrança paga não pode ser editada nem paga novamente. Transação com `SELECT … FOR UPDATE` protege pagamento e edição concorrentes.
+- Clientes inativos permanecem no histórico, mas não podem ser selecionados em novos cadastros/alterações de cobrança. Documento tem validação de formato (11/14 dígitos) e unicidade; não faz consulta à Receita nem verifica dígitos de CPF/CNPJ.
+- Esta versão representa **uma empresa compartilhada**: os usuários autenticados acessam os mesmos clientes/cobranças. Arquivos de exportação pertencem exclusivamente a quem os solicitou.
 
-## Critérios de avaliação
+## Arquitetura
 
-Serão avaliados:
+```text
+Navegador → nginx (React) → Apache/PHP (Laravel) → MySQL
+                                  │                 ↑
+                                  └── fila no banco ┤
+                                         worker ────┘ → storage privado
+                                         scheduler → limpeza de arquivos expirados
+```
 
-* Organização e legibilidade do código
-* Arquitetura da aplicação
-* Modelagem do banco de dados
-* Qualidade da API
-* Componentização do frontend
-* Uso correto do TypeScript
-* Aplicação da regra de negócio
-* Performance das consultas
-* Estratégia de geração dos relatórios
-* Segurança e autenticação
-* Dockerização do projeto
-* Qualidade dos testes automatizados
-* Tratamento de erros
-* Documentação
-* Histórico de commits
-* Qualidade e organização do Pull Request
-* Configuração e uso de agentes de IA, caso utilizados
+O frontend só formata valores e apresenta resultados. `BillingReport` concentra filtros, ordenação e agregações. `InterestCalculator` define a regra financeira. Controllers e Form Requests controlam autenticação, validação e transações. `GenerateReport` materializa um snapshot consistente e `ReportWriter` grava os arquivos em lotes.
 
----
+A API fica em `backend/routes/web.php` de propósito: aplica a pilha de sessão e CSRF a todas as mutações. Sanctum identifica a sessão; não há tokens no localStorage. Frontend e backend usam a mesma origem, evitando configuração CORS e cookies entre domínios. Há limites de tentativas de login e de solicitação de exportações. Detalhes dos endpoints: [docs/API.md](docs/API.md).
 
-## Diferenciais
+## Relatórios e grandes volumes
 
-Serão considerados diferenciais:
+### Consultas e paginação
 
-* Testes no frontend
-* Controle de acesso por perfil
-* Documentação da API
-* Uso de ferramentas de análise de consultas
-* Estratégia para geração de relatórios muito grandes
-* Cache de relatórios ou totalizadores
-* Pipeline de integração contínua
-* Monitoramento ou observabilidade
-* Cobertura de testes documentada
+Os filtros de data/cliente/status e a ordenação são executados no banco. Intervalos de datas são inclusivos e não aplicam funções às colunas filtradas. O join de clientes evita N+1. A página traz no máximo 100 registros, usando cursor com desempate por ID; não há `OFFSET` crescente em páginas profundas. A interface oferece anterior/próxima, sem prometer um número de páginas calculado à força.
 
----
+Totalizadores são agregações SQL sobre **todos** os registros filtrados, não apenas a página. No MySQL, a transação com isolamento padrão REPEATABLE READ mantém linhas e totais da mesma resposta no mesmo snapshot. Requisições de páginas diferentes refletem o estado atual; não prometem um snapshot de toda a sessão de navegação.
 
-## Prazo sugerido
+### Índices
 
-Prazo de entrega sugerido: até 5 dias corridos.
+| Tabela / índice | Objetivo |
+| --- | --- |
+| `customers(document)` único | Integridade do documento e busca por prefixo |
+| `customers(name, id)` | Busca e ordenação por nome, com cursor estável |
+| `customers(active, id)` | Seleção de clientes por situação |
+| `charges(issued_at, id)`, `(due_at, id)`, `(paid_at, id)` | Faixas por data e continuidade de páginas |
+| `charges(customer_id, <cada data>, id)` | Filtros de um cliente dentro de um período |
+| `charges(paid_at, due_at, id)` | Em aberto/vencidas, sem atualizar status diariamente |
+| `charges(original_amount, id)` | Ordenação por valor original |
+| `report_exports(user_id, created_at)` e `(expires_at)` | Histórico privado e expiração |
+| `report_export_rows(export_id, charge_id)` único | Snapshot e paginação por identificador |
+| `report_export_rows(export_id, <issued_at/due_at/original_amount>, charge_id)` | Percorrer o snapshot na ordenação solicitada |
 
-O teste foi planejado para exigir aproximadamente 8 a 12 horas de desenvolvimento.
+Não há um índice para toda combinação possível; índices adicionais também custam escrita e armazenamento. Busca de clientes é por **prefixo**, não `%texto%`. Consulte exemplos de `EXPLAIN` em [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
-Não é necessário implementar funcionalidades além das solicitadas. O foco deve estar na qualidade da solução, nas decisões técnicas e na clareza da implementação.
+Com milhões de linhas, a memória PHP de paginação continua limitada. A agregação exata ainda exige ler os registros correspondentes: relatórios irrestritos não se tornam constantes apenas por existirem índices. Períodos seletivos, réplicas, agregações pré-computadas e cache com invalidação são melhorias para produção. Não há benchmark de milhões de registros declarado como realizado.
+
+### Exportações
+
+1. A API valida e salva filtros, formato e data de referência; retorna HTTP 202.
+2. O worker cria um snapshot no MySQL por `INSERT … SELECT`. Linhas e valores ficam estáveis mesmo que o cadastro mude durante a geração. O snapshot corresponde ao início do processamento, com juros na data da solicitação.
+3. Totais são calculados sobre esse snapshot, e as linhas são percorridas com cursor. CSV usa lotes de 500, escrita incremental, UTF-8 com BOM, separador `;`, aspas e proteção contra fórmulas de planilha.
+4. PDF usa Dompdf limitado a 250 cobranças por arquivo. Relatórios maiores produzem um ZIP com PDFs numerados; cada parte inclui filtros e totais globais claramente identificados. Relatórios vazios também geram arquivos válidos.
+5. Só o arquivo concluído pode ser baixado; os snapshots são removidos após o término. Arquivos expiram em 24 horas; o scheduler remove arquivos e registros expirados a cada hora.
+
+Memória é proporcional ao lote/parte, mas tempo e espaço em disco são proporcionais ao número de registros. O snapshot evita transação de leitura durante toda a renderização, ao custo de espaço adicional e carga de I/O na cópia inicial. Em milhões de registros o PDF gera muitas partes: o CSV é a opção mais prática para análise. Não se tenta renderizar milhões de linhas em um único documento Dompdf.
+
+Há limite de duas exportações ativas por usuário, três solicitações por minuto, timeout de uma hora e `retry_after` de 3700 segundos, maior que o timeout. Falhas ficam visíveis na interface. Para volumes que excedam uma hora, será necessário particionar os jobs, retomar por checkpoints e ajustar infraestrutura; a configuração atual não garante concluir qualquer volume arbitrário.
+
+### Gerar massa de dados
+
+```sh
+docker compose exec backend php artisan billing:generate 100000
+docker compose exec backend php artisan billing:generate 1000000
+```
+
+São novas cobranças, inseridas em lotes de 1000; clientes carregados em memória são limitados a 1000. O comando não apaga dados existentes. Factories também estão disponíveis para clientes e cobranças.
+
+## Próximos passos de produção
+
+TLS, cookies Secure, credenciais próprias, `APP_ENV=production`, desativar a demonstração, imagens sem dependências de desenvolvimento, backups e política de retenção. Acrescentar perfis de acesso e auditoria de pagamentos, observabilidade de filas/consultas, Redis, storage S3 com downloads autorizados e processamento particionado conforme métricas reais. Os serviços locais são uma base de avaliação, não uma configuração de alta disponibilidade.
+
+## Entrega e uso de IA
+
+As instruções de desenvolvimento estão em [AGENTS.md](AGENTS.md) e `backend/AGENTS.md`; as convenções do Laravel Boost estão em `backend/CLAUDE.md`. O enunciado foi preservado em `docs/ENUNCIADO.md`. O código foi desenvolvido com auxílio de IA e verificação por testes; não foram usados agentes paralelos.
+
+O repositório original é [Inffus-Developers/teste-desenvolvedor-gerador-de-relatorios](https://github.com/Inffus-Developers/teste-desenvolvedor-gerador-de-relatorios), e o fork é [C1ph3rBR/teste-desenvolvedor-gerador-de-relatorios](https://github.com/C1ph3rBR/teste-desenvolvedor-gerador-de-relatorios). A solução permanece local na branch `matheus`, com o histórico anterior preservado em `matheus-local-backup`. A integração dos históricos está preparada para revisão e commit manual; a solução ainda não foi enviada ao fork e nenhum PR foi aberto. O README original de `upstream/main` foi preservado integralmente em [docs/ENUNCIADO.md](docs/ENUNCIADO.md). Modelo de descrição: [docs/PULL_REQUEST.md](docs/PULL_REQUEST.md).
+
+As verificações executadas e limitações do ambiente estão em [docs/VALIDACAO.md](docs/VALIDACAO.md).
