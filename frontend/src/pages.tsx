@@ -133,6 +133,13 @@ export function BillingPage({
   }
   function apply(e: FormEvent) {
     e.preventDefault();
+    if (customerName.trim() && !draft.customer_id) {
+      setError(
+        "Selecione um cliente da lista ou limpe o campo para continuar.",
+      );
+      return;
+    }
+    setError(undefined);
     setFilters({ ...draft, sort: filters.sort, direction: filters.direction });
     resetPage();
   }
@@ -287,6 +294,7 @@ export function BillingPage({
               setDraft(cleared);
               setFilters(cleared);
               setCustomerName("");
+              setError(undefined);
               resetPage();
             }}
           >
