@@ -248,4 +248,104 @@ class BillingTest extends TestCase
         $this->assertCount(2, $queries);
         DB::disableQueryLog();
     }
+
+    public function test_expired_jobs_clean_partial_output_and_remain_terminal(): void
+    {
+        $user = $this->login();
+        Storage::fake('local');
+        foreach (['queued', 'processing'] as $status) {
+            $export = ReportExport::create([
+                'user_id' => $user->id, 'format' => 'csv', 'filters' => [],
+                'as_of' => today()->toDateString(), 'expires_at' => now(), 'status' => $status,
+            ]);
+            $path = 'exports/'.$export->id.'/partial.csv';
+            Storage::disk('local')->put($path, 'partial');
+            $export->update(['path' => $path]);
+            DB::table('report_export_rows')->insert([
+                'export_id' => $export->id, 'charge_id' => 1, 'customer_name' => 'Cliente',
+                'description' => 'Parcial', 'issued_at' => today(), 'due_at' => today(),
+                'status' => 'pending', 'original_amount' => '100.00', 'interest' => '0.00',
+                'updated_amount' => '100.00', 'paid_amount' => '0.00',
+            ]);
+            $job = new GenerateReport($export->id);
+            $job->handle(app(BillingReport::class), app(ReportWriter::class));
+            $job->handle(app(BillingReport::class), app(ReportWriter::class));
+            $job->failed(new \RuntimeException('late failure'));
+            $this->assertSame('expired', $export->fresh()->status);
+            $this->assertNull($export->fresh()->path);
+            Storage::disk('local')->assertDirectoryEmpty('exports');
+            $this->assertDatabaseMissing('report_export_rows', ['export_id' => $export->id]);
+            $this->getJson('/api/exports/'.$export->id.'/download')->assertGone();
+        }
+    }
+
+    public function test_expired_exports_release_quota_without_waiting_for_worker_or_pruning(): void
+    {
+        $user = $this->login();
+        Queue::fake();
+        foreach (['queued', 'processing'] as $status) {
+            ReportExport::create([
+                'user_id' => $user->id, 'format' => 'csv', 'filters' => [],
+                'as_of' => today()->toDateString(), 'expires_at' => now(), 'status' => $status,
+            ]);
+        }
+        $this->postJson('/api/exports', ['format' => 'csv'])->assertAccepted();
+        $this->postJson('/api/exports', ['format' => 'pdf'])->assertAccepted();
+        $this->postJson('/api/exports', ['format' => 'csv'])->assertStatus(429);
+        Queue::assertPushed(GenerateReport::class, 2);
+    }
+
+    public function test_repeated_completed_job_preserves_file_and_result(): void
+    {
+        $this->login();
+        Charge::factory()->create();
+        $export = $this->export('csv');
+        $content = Storage::disk('local')->get($export->path);
+        $job = new GenerateReport($export->id);
+        $job->handle(app(BillingReport::class), app(ReportWriter::class));
+        $job->failed(new \RuntimeException('late failure'));
+        $this->assertSame('completed', $export->fresh()->status);
+        $this->assertSame($content, Storage::disk('local')->get($export->path));
+        $this->assertSame(1, $export->fresh()->processed_rows);
+    }
+
+    public function test_export_expiring_during_writing_discards_the_output(): void
+    {
+        $user = $this->login();
+        Storage::fake('local');
+        Charge::factory()->create();
+        $export = ReportExport::create([
+            'user_id' => $user->id, 'format' => 'csv', 'filters' => [],
+            'as_of' => today()->toDateString(), 'expires_at' => now()->addMinute(),
+        ]);
+        DB::listen(function ($query) use ($export) {
+            if (str_contains($query->sql, 'processed_rows') && str_contains($query->sql, '+')
+                && in_array($export->id, $query->bindings, true)) {
+                $this->travelTo($export->expires_at);
+            }
+        });
+        (new GenerateReport($export->id))->handle(app(BillingReport::class), app(ReportWriter::class));
+        $this->assertSame(1, $export->fresh()->processed_rows);
+        $this->assertSame('expired', $export->fresh()->status);
+        $this->assertNull($export->fresh()->path);
+        Storage::disk('local')->assertDirectoryEmpty('exports');
+        $this->assertDatabaseMissing('report_export_rows', ['export_id' => $export->id]);
+    }
+
+    public function test_duplicate_job_does_not_restart_processing_or_failed_exports(): void
+    {
+        $user = $this->login();
+        Storage::fake('local');
+        foreach (['processing', 'failed'] as $status) {
+            $export = ReportExport::create([
+                'user_id' => $user->id, 'format' => 'csv', 'filters' => [],
+                'as_of' => today()->toDateString(), 'expires_at' => now()->addDay(),
+                'status' => $status, 'processed_rows' => 10,
+            ]);
+            (new GenerateReport($export->id))->handle(app(BillingReport::class), app(ReportWriter::class));
+            $this->assertSame($status, $export->fresh()->status);
+            $this->assertSame(10, $export->fresh()->processed_rows);
+            $this->assertSame([], Storage::disk('local')->allFiles());
+        }
+    }
 }

@@ -24,7 +24,8 @@ class ExportController extends Controller
         $request->validate(['format' => 'required|in:csv,pdf']);
         $export = DB::transaction(function () use ($request) {
             User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
-            $active = ReportExport::where('user_id', $request->user()->id)->whereIn('status', ['queued', 'processing'])->count();
+            $active = ReportExport::where('user_id', $request->user()->id)
+                ->whereIn('status', ['queued', 'processing'])->where('expires_at', '>', now())->count();
             abort_if($active >= 2, 429, 'Aguarde a conclusão das exportações em andamento.');
             $export = ReportExport::create([
                 'user_id' => $request->user()->id, 'format' => $request->input('format'),
@@ -41,7 +42,7 @@ class ExportController extends Controller
     public function download(Request $request, ReportExport $export): BinaryFileResponse
     {
         abort_unless($export->user_id === $request->user()->id, 404);
-        abort_if($export->expires_at->isPast(), 410, 'Esta exportação expirou. Gere um novo arquivo.');
+        abort_if($export->expires_at->lessThanOrEqualTo(now()), 410, 'Esta exportação expirou. Gere um novo arquivo.');
         abort_unless($export->status === 'completed' && $export->path, 409, 'O arquivo ainda não está disponível.');
         abort_unless(Storage::disk('local')->exists($export->path), 404);
 

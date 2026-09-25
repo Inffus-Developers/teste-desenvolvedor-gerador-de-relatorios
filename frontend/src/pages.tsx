@@ -784,6 +784,7 @@ export function ExportsPage({ tick }: { tick: number }) {
                                 processing: "Gerando",
                                 completed: "Concluído",
                                 failed: "Falhou",
+                                expired: "Expirado",
                               }[item.status]}
                         </span>
                         {item.error && (

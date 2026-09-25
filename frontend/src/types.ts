@@ -48,7 +48,7 @@ export type Report = { rows: Page<Charge>; totals: Totals; as_of: string };
 export type Export = {
   id: string;
   format: "csv" | "pdf";
-  status: "queued" | "processing" | "completed" | "failed";
+  status: "queued" | "processing" | "completed" | "failed" | "expired";
   processed_rows: number;
   totals: Totals | null;
   created_at: string;
