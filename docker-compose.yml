@@ -1,0 +1,110 @@
+name: clara-billing
+
+x-backend: &backend
+  build:
+    context: ./backend
+  environment: &backend-env
+    APP_NAME: Clara
+    APP_ENV: local
+    APP_DEBUG: "false"
+    APP_URL: http://localhost:${APP_PORT:-8080}
+    APP_LOCALE: pt_BR
+    LOG_CHANNEL: stderr
+    DB_CONNECTION: mysql
+    DB_HOST: mysql
+    DB_PORT: 3306
+    DB_DATABASE: clara
+    DB_USERNAME: clara
+    DB_PASSWORD: ${DB_PASSWORD:-clara_local_2026}
+    SESSION_DRIVER: database
+    SESSION_SECURE_COOKIE: "false"
+    CACHE_STORE: database
+    QUEUE_CONNECTION: database
+    DB_QUEUE_RETRY_AFTER: 3700
+    DEMO_EMAIL: ${DEMO_EMAIL:-admin@clara.local}
+    DEMO_PASSWORD: ${DEMO_PASSWORD:-Clara@2026!}
+  volumes:
+    - backend_storage:/var/www/html/storage
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: clara
+      MYSQL_USER: clara
+      MYSQL_PASSWORD: ${DB_PASSWORD:-clara_local_2026}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-clara_root_local_2026}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u clara clara -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  init:
+    <<: *backend
+    command: ["sh", "-c", "php artisan migrate --force && php artisan db:seed --force"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  backend:
+    <<: *backend
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  worker:
+    <<: *backend
+    command: ["php", "artisan", "queue:work", "--sleep=2", "--tries=1", "--timeout=3600", "--memory=512"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    stop_grace_period: 65m
+
+  scheduler:
+    <<: *backend
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  test:
+    <<: *backend
+    profiles: ["test"]
+    environment:
+      <<: *backend-env
+      APP_ENV: testing
+      DB_DATABASE: clara_test
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+    command: ["php", "artisan", "test"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  backend_storage:
