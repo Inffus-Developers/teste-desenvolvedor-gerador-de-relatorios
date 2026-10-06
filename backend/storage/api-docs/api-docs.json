@@ -1,0 +1,1519 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Gerador de Relatórios",
+        "description": "API de faturamento. Os registros exigem o token retornado no login.",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/health": {
+            "get": {
+                "tags": [
+                    "Sistema"
+                ],
+                "summary": "Consulta a disponibilidade da API",
+                "operationId": "health",
+                "responses": {
+                    "200": {
+                        "description": "API disponível",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "status"
+                                    ],
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "ok"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "servers": [
+                    {
+                        "url": "http://localhost:8000",
+                        "description": "Servidor local"
+                    }
+                ]
+            }
+        },
+        "/api/login": {
+            "post": {
+                "tags": [
+                    "Autenticação"
+                ],
+                "summary": "Autentica um usuário",
+                "operationId": "login",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "admin@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "password"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Sessão iniciada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "token",
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "token": {
+                                            "type": "string"
+                                        },
+                                        "data": {
+                                            "required": [
+                                                "id",
+                                                "name",
+                                                "email"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "Administrador"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "format": "email",
+                                                    "example": "admin@example.com"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Credenciais inválidas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "message"
+                                    ],
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Credenciais inválidas."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Dados inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "message",
+                                        "errors"
+                                    ],
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Informe o e-mail."
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "example": {
+                                                "email": [
+                                                    "Informe o e-mail."
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "servers": [
+                    {
+                        "url": "http://localhost:8000",
+                        "description": "Servidor local"
+                    }
+                ]
+            }
+        },
+        "/api/user": {
+            "get": {
+                "tags": [
+                    "Autenticação"
+                ],
+                "summary": "Retorna o usuário autenticado",
+                "operationId": "currentUser",
+                "responses": {
+                    "200": {
+                        "description": "Usuário autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "required": [
+                                                "id",
+                                                "name",
+                                                "email"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "Administrador"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "format": "email",
+                                                    "example": "admin@example.com"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Não autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "message"
+                                    ],
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Não autenticado."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "servers": [
+                    {
+                        "url": "http://localhost:8000",
+                        "description": "Servidor local"
+                    }
+                ]
+            }
+        },
+        "/api/logout": {
+            "post": {
+                "tags": [
+                    "Autenticação"
+                ],
+                "summary": "Encerra a sessão atual",
+                "operationId": "logout",
+                "responses": {
+                    "204": {
+                        "description": "Sessão encerrada"
+                    },
+                    "401": {
+                        "description": "Não autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "message"
+                                    ],
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Não autenticado."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "servers": [
+                    {
+                        "url": "http://localhost:8000",
+                        "description": "Servidor local"
+                    }
+                ]
+            }
+        },
+        "/api/billings": {
+            "get": {
+                "tags": [
+                    "Cobranças"
+                ],
+                "summary": "Lista cobranças",
+                "operationId": "listBillings",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Página de cobranças",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Billing"
+                                            }
+                                        },
+                                        "meta": {
+                                            "required": [
+                                                "current_page",
+                                                "last_page",
+                                                "per_page",
+                                                "total"
+                                            ],
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cobranças"
+                ],
+                "summary": "Cadastra uma cobrança",
+                "operationId": "createBilling",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BillingInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Cobrança cadastrada"
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "422": {
+                        "description": "Dados inválidos"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/billings/{billing}": {
+            "get": {
+                "tags": [
+                    "Cobranças"
+                ],
+                "summary": "Visualiza uma cobrança",
+                "operationId": "showBilling",
+                "parameters": [
+                    {
+                        "name": "billing",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cobrança encontrada"
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "404": {
+                        "description": "Registro não encontrado"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Cobranças"
+                ],
+                "summary": "Edita uma cobrança",
+                "operationId": "updateBilling",
+                "parameters": [
+                    {
+                        "name": "billing",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BillingInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cobrança atualizada"
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "404": {
+                        "description": "Registro não encontrado"
+                    },
+                    "422": {
+                        "description": "Dados inválidos"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/billings/{billing}/payment": {
+            "post": {
+                "tags": [
+                    "Cobranças"
+                ],
+                "summary": "Registra o pagamento e congela os juros",
+                "operationId": "payBilling",
+                "parameters": [
+                    {
+                        "name": "billing",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BillingPaymentInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Pagamento registrado"
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "404": {
+                        "description": "Registro não encontrado"
+                    },
+                    "422": {
+                        "description": "Dados inválidos ou cobrança já paga"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customers": {
+            "get": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Lista clientes",
+                "operationId": "listCustomers",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Trecho do nome ou do documento",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Página de clientes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Customer"
+                                            }
+                                        },
+                                        "meta": {
+                                            "required": [
+                                                "current_page",
+                                                "last_page",
+                                                "per_page",
+                                                "total"
+                                            ],
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Cadastra um cliente",
+                "operationId": "createCustomer",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CustomerInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Cliente cadastrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Customer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "422": {
+                        "description": "Dados inválidos"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customers/{customer}": {
+            "get": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Visualiza um cliente",
+                "operationId": "showCustomer",
+                "parameters": [
+                    {
+                        "name": "customer",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cliente encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Customer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "404": {
+                        "description": "Registro não encontrado"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Edita um cliente",
+                "operationId": "updateCustomer",
+                "parameters": [
+                    {
+                        "name": "customer",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CustomerInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cliente atualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Customer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "404": {
+                        "description": "Registro não encontrado"
+                    },
+                    "422": {
+                        "description": "Dados inválidos"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reports/billings": {
+            "get": {
+                "tags": [
+                    "Relatórios"
+                ],
+                "summary": "Relatório de cobranças por período",
+                "operationId": "billingReport",
+                "parameters": [
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "description": "Base do período",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "issued",
+                                "due",
+                                "paid"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "customer_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Pendente é a cobrança em aberto dentro do prazo. Vencida deriva de pendente com vencimento anterior a hoje.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pending",
+                                "overdue",
+                                "paid"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "customer",
+                                "description",
+                                "issued_on",
+                                "due_on",
+                                "paid_on",
+                                "status",
+                                "original_amount",
+                                "interest_amount",
+                                "updated_amount",
+                                "amount_paid"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "direction",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Padrão 15. Máximo 100.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Página do relatório e totalizadores do filtro inteiro",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data",
+                                        "meta",
+                                        "totals"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Billing"
+                                            }
+                                        },
+                                        "meta": {
+                                            "required": [
+                                                "current_page",
+                                                "last_page",
+                                                "per_page",
+                                                "total"
+                                            ],
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "totals": {
+                                            "$ref": "#/components/schemas/BillingReportTotals"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "422": {
+                        "description": "Filtros inválidos"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reports/export": {
+            "post": {
+                "tags": [
+                    "Relatórios"
+                ],
+                "summary": "Enfileira a exportação do relatório",
+                "description": "Cria um processamento com os filtros da consulta e devolve 202. O arquivo é gerado pelo worker, em CSV ou PDF, fora desta requisição.",
+                "operationId": "createBillingReportExport",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "period",
+                                    "from",
+                                    "to",
+                                    "format"
+                                ],
+                                "properties": {
+                                    "period": {
+                                        "type": "string",
+                                        "enum": [
+                                            "issued",
+                                            "due",
+                                            "paid"
+                                        ]
+                                    },
+                                    "from": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "to": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "customer_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "enum": [
+                                            "pending",
+                                            "overdue",
+                                            "paid"
+                                        ]
+                                    },
+                                    "sort": {
+                                        "type": "string"
+                                    },
+                                    "direction": {
+                                        "type": "string",
+                                        "enum": [
+                                            "asc",
+                                            "desc"
+                                        ]
+                                    },
+                                    "format": {
+                                        "type": "string",
+                                        "enum": [
+                                            "csv",
+                                            "pdf"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Exportação aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "job_id"
+                                    ],
+                                    "properties": {
+                                        "job_id": {
+                                            "type": "integer",
+                                            "example": 1
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "422": {
+                        "description": "Filtros inválidos"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reports/export/{reportJob}": {
+            "get": {
+                "tags": [
+                    "Relatórios"
+                ],
+                "summary": "Consulta o processamento da exportação",
+                "operationId": "showBillingReportExport",
+                "parameters": [
+                    {
+                        "name": "reportJob",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Estado do processamento",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "id",
+                                        "status"
+                                    ],
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "pending",
+                                                "processing",
+                                                "done",
+                                                "failed"
+                                            ]
+                                        },
+                                        "download_url": {
+                                            "type": "string",
+                                            "example": "/api/reports/export/1/download"
+                                        },
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "404": {
+                        "description": "Registro não encontrado"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reports/export/{reportJob}/download": {
+            "get": {
+                "tags": [
+                    "Relatórios"
+                ],
+                "summary": "Baixa o arquivo gerado",
+                "description": "Disponível quando o processamento está concluído. O caminho interno do arquivo não é exposto.",
+                "operationId": "downloadBillingReportExport",
+                "parameters": [
+                    {
+                        "name": "reportJob",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Arquivo CSV ou PDF"
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    },
+                    "404": {
+                        "description": "Registro ou arquivo não encontrado"
+                    },
+                    "422": {
+                        "description": "Relatório ainda não está pronto"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "BillingCustomer": {
+                "required": [
+                    "id",
+                    "name"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Maria Silva"
+                    }
+                },
+                "type": "object"
+            },
+            "Billing": {
+                "required": [
+                    "id",
+                    "customer_id",
+                    "customer",
+                    "description",
+                    "original_amount",
+                    "issued_on",
+                    "due_on",
+                    "paid_on",
+                    "monthly_interest_rate",
+                    "status",
+                    "interest_amount",
+                    "updated_amount",
+                    "amount_paid",
+                    "days_overdue",
+                    "overdue"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "customer_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "customer": {
+                        "$ref": "#/components/schemas/BillingCustomer"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Mensalidade de outubro"
+                    },
+                    "original_amount": {
+                        "type": "string",
+                        "example": "150.00"
+                    },
+                    "issued_on": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-01"
+                    },
+                    "due_on": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-10"
+                    },
+                    "paid_on": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-09",
+                        "nullable": true
+                    },
+                    "monthly_interest_rate": {
+                        "description": "Taxa decimal. 0.02 equivale a 2% ao mês.",
+                        "type": "string",
+                        "example": "0.020000"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "pending",
+                        "enum": [
+                            "pending",
+                            "paid"
+                        ]
+                    },
+                    "interest_amount": {
+                        "type": "string",
+                        "example": "2.00"
+                    },
+                    "updated_amount": {
+                        "type": "string",
+                        "example": "152.00"
+                    },
+                    "amount_paid": {
+                        "type": "string",
+                        "example": "152.00",
+                        "nullable": true
+                    },
+                    "days_overdue": {
+                        "type": "integer",
+                        "example": 30
+                    },
+                    "overdue": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "BillingPaymentInput": {
+                "required": [
+                    "paid_on"
+                ],
+                "properties": {
+                    "paid_on": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-11-09"
+                    }
+                },
+                "type": "object"
+            },
+            "BillingInput": {
+                "required": [
+                    "customer_id",
+                    "description",
+                    "original_amount",
+                    "issued_on",
+                    "due_on",
+                    "monthly_interest_rate",
+                    "status"
+                ],
+                "properties": {
+                    "customer_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Mensalidade de outubro",
+                        "maxLength": 255
+                    },
+                    "original_amount": {
+                        "type": "number",
+                        "example": 150,
+                        "minimum": 0.01
+                    },
+                    "issued_on": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-01"
+                    },
+                    "due_on": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-10"
+                    },
+                    "paid_on": {
+                        "type": "string",
+                        "format": "date",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "monthly_interest_rate": {
+                        "type": "number",
+                        "example": 0.02,
+                        "maximum": 1,
+                        "minimum": 0
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "pending",
+                        "enum": [
+                            "pending",
+                            "paid"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "Customer": {
+                "required": [
+                    "id",
+                    "name",
+                    "document",
+                    "email",
+                    "status"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Maria Silva"
+                    },
+                    "document": {
+                        "type": "string",
+                        "example": "12345678901"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "maria@example.com"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "active",
+                        "enum": [
+                            "active",
+                            "inactive"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "CustomerInput": {
+                "required": [
+                    "name",
+                    "document",
+                    "email",
+                    "status"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Maria Silva",
+                        "maxLength": 255
+                    },
+                    "document": {
+                        "type": "string",
+                        "example": "12345678901",
+                        "maxLength": 32
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "maria@example.com",
+                        "maxLength": 255
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "active",
+                        "enum": [
+                            "active",
+                            "inactive"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "BillingReportTotals": {
+                "required": [
+                    "count",
+                    "original_amount",
+                    "interest_amount",
+                    "updated_amount",
+                    "amount_paid",
+                    "pending_amount"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "original_amount": {
+                        "type": "string",
+                        "example": "300.00"
+                    },
+                    "interest_amount": {
+                        "type": "string",
+                        "example": "2.99"
+                    },
+                    "updated_amount": {
+                        "type": "string",
+                        "example": "302.99"
+                    },
+                    "amount_paid": {
+                        "type": "string",
+                        "example": "302.99"
+                    },
+                    "pending_amount": {
+                        "type": "string",
+                        "example": "0.00"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "description": "Token retornado por POST /api/login. Envie como Bearer.",
+                "scheme": "bearer",
+                "bearerFormat": "Sanctum"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Sistema",
+            "description": "Disponibilidade da API"
+        },
+        {
+            "name": "Autenticação",
+            "description": "Login e sessão"
+        },
+        {
+            "name": "Cobranças",
+            "description": "Cadastro de cobranças"
+        },
+        {
+            "name": "Clientes",
+            "description": "Cadastro de clientes"
+        },
+        {
+            "name": "Relatórios",
+            "description": "Relatório de faturamento"
+        }
+    ]
+}
