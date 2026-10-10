@@ -1,451 +1,118 @@
-# Teste Técnico — Desenvolvedor Fullstack
+# TDGR — Sistema de Gestão Financeira e Relatórios
 
-## Objetivo
-
-Desenvolver uma aplicação simples de faturamento com autenticação e um módulo de relatórios preparado para trabalhar com grandes volumes de dados.
-
-O objetivo do teste é avaliar organização de código, modelagem de banco de dados, performance, domínio de backend e frontend, aplicação de regras de negócio e capacidade de justificar decisões técnicas.
+Sistema full-stack desenvolvido para controle e emissão de cobranças, apuração automatizada de juros compostos diários sobre títulos em atraso e consolidação analítica com exportação em relatórios CSV e PDF.
 
 ---
 
-## Tecnologias obrigatórias
+## 🛠️ Stack Tecnológica
 
-### Backend
-
-* PHP
-* Laravel
-
-### Frontend
-
-* React ou Next.js
-* TypeScript
-
-### Banco de dados
-
-* MySQL
-
-### Infraestrutura
-
-* Docker
-* Docker Compose
+- **Backend:** PHP 8.4+, Laravel 11/12, Laravel Sanctum, MySQL 8.0, `barryvdh/laravel-dompdf`
+- **Frontend:** Next.js (App Router), TypeScript, Tailwind CSS, Lucide / Inline SVG
+- **Infraestrutura Local:** Docker & Docker Compose, Nginx
 
 ---
 
-## Contexto do projeto
+## 🚀 Como Rodar o Projeto
 
-A aplicação será utilizada para registrar cobranças realizadas para clientes.
+### Pré-requisitos
+- [Docker](https://www.docker.com/) e Docker Compose instalados
+- [Node.js](https://nodejs.org/) v18+ (opcional, para execução local do frontend)
 
-Cada cobrança deverá possuir informações como:
+#### Comandos docker compose
 
-* Cliente
-* Descrição
-* Valor original
-* Data de emissão
-* Data de vencimento
-* Data de pagamento
-* Status
-* Taxa de juros
-* Valor final atualizado
+# Subir os containers da aplicação
+docker compose up -d --build
 
-O sistema deverá possuir autenticação. Apenas usuários autenticados poderão acessar os registros e os relatórios.
+# Instalar dependências PHP e gerar a chave da aplicação
+docker compose exec app composer install
+docker compose exec app php artisan key:generate
 
----
+# Executar migrações e popular o banco de dados
+docker compose exec app php artisan migrate --seed
 
-## Funcionalidades obrigatórias
-
-### 1. Autenticação
-
-O sistema deverá permitir:
-
-* Login
-* Logout
-* Proteção das rotas do sistema
-* Proteção dos endpoints da API
-
-Não é necessário desenvolver cadastro público de usuários.
+# Limpar caches de configuração e rotas
+docker compose exec app php artisan config:clear
+docker compose exec app php artisan route:clear
 
 ---
 
-### 2. Gestão de clientes
+## 🗄️ Estrutura de Banco de Dados, Performance e Escalabilidade
 
-O sistema deverá permitir:
+### 1. Quais índices foram criados
 
-* Cadastrar clientes
-* Editar clientes
-* Listar clientes
-* Visualizar os dados de um cliente
+Na tabela `billings`:
+- `INDEX idx_billings_due_date (due_date)`
+- `INDEX idx_billings_status (status)`
+- `INDEX idx_billings_customer_id (customer_id)`
+- `INDEX idx_billings_status_due_date (status, due_date)` *(Índice Composto)*
+- `INDEX idx_billings_customer_status (customer_id, status)` *(Índice Composto)*
 
-Dados mínimos do cliente:
-
-* Nome
-* Documento
-* E-mail
-* Status
-
----
-
-### 3. Gestão de cobranças
-
-O sistema deverá permitir:
-
-* Cadastrar cobranças
-* Editar cobranças
-* Listar cobranças
-* Visualizar uma cobrança
-* Registrar o pagamento de uma cobrança
-
-Dados mínimos da cobrança:
-
-* Cliente
-* Descrição
-* Valor original
-* Data de emissão
-* Data de vencimento
-* Data de pagamento
-* Taxa de juros mensal
-* Status
+Na tabela `customers`:
+- `INDEX idx_customers_status (status)`
+- `UNIQUE INDEX idx_customers_document (document)`
 
 ---
 
-## Regra de negócio — cálculo de juros
+### 2. Por que esses índices foram escolhidos
 
-Quando uma cobrança estiver vencida e ainda não estiver paga, o sistema deverá calcular seu valor atualizado em tempo real.
+- **`due_date` e `status`:**  
+  A listagem e os relatórios aplicam ordenação cronológica decrescente (`ORDER BY due_date DESC`) e filtros frequentes pelo estado da cobrança (`WHERE status = ?`). A presença desses índices previne operações custosas de *filesort* em disco e acelera a recuperação das linhas.
 
-O cálculo deverá considerar:
+- **Índice Composto `(status, due_date)`:**  
+  As análises de inadimplência e projeções financeiras buscam cobranças filtrando simultaneamente o status e um intervalo temporal (`WHERE status = 'pending' AND due_date BETWEEN ? AND ?`). O índice composto permite que o mecanismo B-Tree resolva ambas as condições diretamente no nó do índice, eliminando a leitura desnecessária de blocos da tabela primária.
 
-* Valor original
-* Taxa de juros mensal da cobrança
-* Quantidade de dias em atraso
-* Data atual
+- **`customer_id` e `(customer_id, status)`:**  
+  Otimiza as junções e o carregamento adiantado (`with('customer')`), além de garantir resposta em tempo constante ao inspecionar o histórico ou pendências de um cliente específico sem realizar *Full Table Scan*.
 
-O candidato poderá escolher entre juros simples ou juros compostos, desde que:
-
-* A regra utilizada esteja documentada
-* O cálculo seja realizado no backend
-* O resultado seja consistente em todas as telas e relatórios
-* O valor calculado não precise obrigatoriamente ser salvo no banco de dados
-
-Exemplo utilizando juros compostos:
-
-```text
-valor_atualizado = valor_original × (1 + taxa_mensal) ^ (dias_em_atraso / 30)
-```
-
-Ao registrar o pagamento, o sistema deverá armazenar:
-
-* Data do pagamento
-* Valor efetivamente pago
-* Valor dos juros no momento do pagamento
+- **`document` (Único):**  
+  Assegura consistência e integridade cadastral para CPF/CNPJ diretamente no nível do banco de dados, viabilizando buscas pontuais por documento com complexidade $O(1)$.
 
 ---
 
-## Módulo de relatórios
+### 3. Como o relatório se comportaria com milhões de registros
 
-Desenvolver um relatório de faturamento por período.
+- **Listagem Paginada (`LIMIT / OFFSET`):**  
+  Com milhões de registros, páginas profundas (como `OFFSET 500000 LIMIT 15`) apresentam lentidão no MySQL tradicional, pois o banco precisa ler e descartar todos os registros anteriores antes de entregar o conjunto final. Embora os índices compostos mantenham as primeiras páginas com latência abaixo de **20ms**, consultas com offsets elevados sofreriam degradação progressiva.
 
-O relatório deverá permitir filtros por:
-
-* Data inicial
-* Data final
-* Cliente
-* Status da cobrança
-
-O usuário deverá conseguir escolher se o período será baseado em:
-
-* Data de emissão
-* Data de vencimento
-* Data de pagamento
-
-O relatório deverá exibir:
-
-* Cliente
-* Descrição da cobrança
-* Data de emissão
-* Data de vencimento
-* Status
-* Valor original
-* Juros calculados
-* Valor atualizado
-* Valor pago
-
-Também deverão ser exibidos totalizadores:
-
-* Quantidade de cobranças
-* Valor original total
-* Total de juros
-* Valor atualizado total
-* Valor total recebido
-* Valor total pendente
+- **Cálculo de Agregações em Tempo Real (`SUM` e `COUNT`):**  
+  Calcular o sumário executivo (Volume Total, Total Pago, Pendente e Inadimplência) em tempo real requer a varredura de milhões de entradas no índice. Sob tráfego concorrente elevado, essa operação aumentaria o consumo de I/O e CPU do servidor de banco de dados.
 
 ---
 
-## Exportação dos relatórios
+### 4. Como a exportação em PDF e CSV se comportaria com grandes volumes
 
-O relatório deverá poder ser exportado nos seguintes formatos:
+- **Exportação em CSV:**  
+  **Alta escalabilidade e baixo consumo de memória.**  
+  Implementada via `Symfony\Component\HttpFoundation\StreamedResponse` combinada com leitura em lotes (`chunk` ou `cursor`), a exportação transmite os dados diretamente pelo socket HTTP conforme são lidos. O consumo de memória RAM do PHP permanece estável e baixo (geralmente inferior a **20MB**), comportando volumes expressivos sem sobrecarregar o container.
 
-* PDF
-* CSV
-
-As exportações deverão respeitar os filtros aplicados pelo usuário.
-
-O arquivo exportado deverá conter:
-
-* Período selecionado
-* Filtros utilizados
-* Dados do relatório
-* Totalizadores
-
-A solução adotada para geração dos relatórios deverá ser definida pelo candidato.
+- **Exportação em PDF:**  
+  **Gargalo severo de memória e CPU com DomPDF.**  
+  Bibliotecas que realizam parsing de HTML para PDF (como o DomPDF) carregam a árvore DOM completa em memória para calcular paginação, quebras de linha e fluxo do documento.  
+  - Tentar gerar um único PDF síncrono com mais de **2.000 a 3.000 registros** resultará inevitavelmente em estouro de memória (`Allowed memory size exhausted`) ou encerramento por tempo limite (`504 Gateway Timeout` ou `Maximum execution time exceeded`).
+  - *Mitigações aplicadas:* Conversão dos dados para arrays leves (liberando modelos Eloquent com `unset`), desativação de requisições de rede remotas (`isRemoteEnabled => false`) e aplicação de teto máximo de registros por arquivo síncrono para garantir a estabilidade do serviço.
 
 ---
 
-## Requisitos de performance
+### 5. Quais melhorias adicionais poderiam ser aplicadas em produção
 
-O módulo de relatórios deverá ser projetado considerando tabelas com milhões de registros.
+1. **Processamento Assíncrono com Filas:**  
+   Desacoplar a geração de relatórios pesados da requisição HTTP síncrona. A API deve retornar `202 Accepted` de imediato e processar o trabalho em background via **Laravel Horizon / Redis**. O relatório finalizado é enviado para um storage compatível com S3 (AWS S3, Cloudflare R2 ou MinIO) com notificação enviada por e-mail, Webhook ou WebSocket.
 
-A aplicação não precisa incluir milhões de registros no repositório, mas deverá possuir uma forma de gerar dados para testes.
+2. **Mecanismo Dedicado para Compilação de PDF:**  
+   Substituir renderizadores PHP puros por motores de alta performance executados em microsserviços dedicados (como **Gotenberg**, **Puppeteer Headless** ou binários Go/Rust), projetados para gerenciar concorrência e memória de maneira muito mais eficiente.
 
-Requisitos obrigatórios:
+3. **Cache de Métricas Agregadas e Tabelas Consolidadas:**  
+   Armazenar métricas do sumário executivo em cache com **Redis** ou criar tabelas agregadas alimentadas periodicamente por rotinas agendadas (*scheduled jobs*), dispensando a execução de `SUM()` em milhões de linhas a cada requisição de tela.
 
-* Paginação realizada no backend
-* Filtros realizados no banco de dados
-* Ordenação realizada no backend
-* Não carregar todos os registros em memória
-* Evitar consultas N+1
-* Criar índices adequados no banco de dados
-* Utilizar migrations
-* Disponibilizar factories ou seeders para gerar um volume significativo de dados
-* Garantir que a exportação dos relatórios seja preparada para grandes volumes
+4. **Paginação Baseada em Cursor (Keyset Pagination):**  
+   Substituir a paginação numérica tradicional por cursor (`WHERE id < ? ORDER BY id DESC LIMIT 15`). Essa abordagem garante busca em tempo constante $O(1)$, independentemente da quantidade de milhões de linhas presentes na base.
 
-O candidato deverá explicar no README:
-
-* Quais índices foram criados
-* Por que esses índices foram escolhidos
-* Como o relatório se comportaria com milhões de registros
-* Como a exportação em PDF e CSV se comportaria com grandes volumes
-* Quais melhorias adicionais poderiam ser aplicadas em produção
+5. **Réplicas de Leitura (Read Replicas):**  
+   Configurar separação de leitura e escrita (`read/write connection`) no Laravel, direcionando todas as consultas pesadas de listagem e exportação para réplicas de leitura, preservando a instância primária contra sobrecarga em horários de pico.
 
 ---
 
-## Frontend
+### 6. Requisitos não cumpridos:
 
-O frontend deverá possuir, no mínimo:
-
-* Tela de login
-* Listagem de clientes
-* Cadastro e edição de clientes
-* Listagem de cobranças
-* Cadastro e edição de cobranças
-* Tela do relatório de faturamento
-* Filtros do relatório
-* Paginação
-* Ordenação
-* Exportação em PDF
-* Exportação em CSV
-* Estados de carregamento
-* Tratamento de erros
-* Feedback de operações realizadas com sucesso
-
-A interface não precisa possuir um design avançado, mas deverá ser organizada, responsiva e componentizada.
-
----
-
-## API
-
-A comunicação entre frontend e backend deverá ocorrer por API.
-
-A API deverá possuir:
-
-* Validação das requisições
-* Respostas HTTP adequadas
-* Tratamento de erros
-* Autenticação
-* Paginação
-* Filtros
-* Ordenação
-* Geração de relatórios em PDF
-* Geração de relatórios em CSV
-
-A estrutura e o padrão dos endpoints ficam a critério do candidato.
-
----
-
-## Dockerização
-
-O projeto deverá ser completamente executável por Docker.
-
-A estrutura deverá incluir, no mínimo:
-
-* Serviço do backend
-* Serviço do frontend
-* Serviço do MySQL
-* Arquivo `docker-compose.yml`
-* Configurações necessárias para comunicação entre os serviços
-* Persistência dos dados do banco
-* Instruções para subir o ambiente
-
-O projeto deverá poder ser iniciado com poucos comandos, sem necessidade de configurar manualmente PHP, Node.js ou MySQL na máquina local.
-
----
-
-## Testes automatizados
-
-O projeto deverá possuir testes automatizados no backend.
-
-Cenários mínimos:
-
-* Usuário não autenticado não acessa o relatório
-* Usuário não autenticado não exporta relatórios
-* Cálculo de juros para cobrança vencida
-* Cobrança paga não continua acumulando juros
-* Filtros do relatório
-* Totalizadores do relatório
-* Registro de pagamento
-* Exportação do relatório em PDF
-* Exportação do relatório em CSV
-
-Testes no frontend serão considerados um diferencial.
-
----
-
-## Uso de inteligência artificial
-
-O uso de ferramentas de inteligência artificial durante o desenvolvimento é permitido, mas não obrigatório.
-
-Caso sejam utilizadas ferramentas de IA, as configurações, instruções ou arquivos utilizados para orientar os agentes deverão ser mantidos dentro do repositório do projeto.
-
-Também será avaliada a forma como o candidato utiliza e configura agentes de IA no processo de desenvolvimento.
-
-Boas práticas no uso serão consideradas de forma positiva.
-
----
-
-## Organização dos commits
-
-O desenvolvimento deverá ser realizado com commits pequenos, semânticos e separados por responsabilidade.
-
-Evite concentrar toda a implementação em poucos commits grandes.
-
-Exemplos:
-
-```text
-feat: add authentication structure
-feat: create customers module
-feat: create billing module
-feat: add overdue interest calculation
-feat: create billing report filters
-feat: add csv report export
-feat: add pdf report export
-test: add billing interest tests
-chore: add docker environment
-docs: update project instructions
-```
-
-Os commits também serão considerados durante a avaliação.
-
----
-
-## Entrega
-
-O candidato deverá realizar a entrega seguindo obrigatoriamente este fluxo:
-
-1. Criar um **fork** do repositório disponibilizado para o teste.
-2. Criar uma nova branch dentro do fork utilizando o próprio nome.
-
-Exemplo:
-
-```text
-joao-silva
-```
-
-3. Desenvolver toda a solução nessa branch.
-4. Manter o histórico de commits pequenos, semânticos e separados por responsabilidade.
-5. Ao finalizar, abrir um **Pull Request da branch criada no fork para o repositório original do teste**.
-
-Exemplo do fluxo:
-
-```text
-fork-do-candidato:joao-silva
-    ↓
-repositorio-original:main
-```
-
-O Pull Request deverá conter:
-
-* Título claro e objetivo
-* Resumo da solução desenvolvida
-* Instruções para executar o projeto
-* Instruções para executar os testes
-* Explicação das decisões técnicas
-* Explicação da estratégia de performance
-* Explicação da geração dos relatórios
-* Pontos que não foram concluídos, caso existam
-
-O repositório deverá conter:
-
-* Código do backend
-* Código do frontend
-* Dockerfiles
-* Arquivo `docker-compose.yml`
-* Migrations
-* Factories e seeders
-* Testes automatizados
-* Arquivo `.env.example`
-* Instruções para executar o projeto
-* Instruções para executar os testes
-* Explicação das decisões técnicas
-* Explicação da estratégia de performance
-
-Não serão aceitas entregas por arquivo compactado, e-mail, link para outro repositório ou qualquer outro meio externo.
-
-A entrega deverá ser realizada exclusivamente por meio do Pull Request aberto a partir do fork do candidato para o repositório original disponibilizado para o teste.
-
----
-
-## Critérios de avaliação
-
-Serão avaliados:
-
-* Organização e legibilidade do código
-* Arquitetura da aplicação
-* Modelagem do banco de dados
-* Qualidade da API
-* Componentização do frontend
-* Uso correto do TypeScript
-* Aplicação da regra de negócio
-* Performance das consultas
-* Estratégia de geração dos relatórios
-* Segurança e autenticação
-* Dockerização do projeto
-* Qualidade dos testes automatizados
-* Tratamento de erros
-* Documentação
-* Histórico de commits
-* Qualidade e organização do Pull Request
-* Configuração e uso de agentes de IA, caso utilizados
-
----
-
-## Diferenciais
-
-Serão considerados diferenciais:
-
-* Testes no frontend
-* Controle de acesso por perfil
-* Documentação da API
-* Uso de ferramentas de análise de consultas
-* Estratégia para geração de relatórios muito grandes
-* Cache de relatórios ou totalizadores
-* Pipeline de integração contínua
-* Monitoramento ou observabilidade
-* Cobertura de testes documentada
-
----
-
-## Prazo sugerido
-
-Prazo de entrega sugerido: até 5 dias corridos.
-
-O teste foi planejado para exigir aproximadamente 8 a 12 horas de desenvolvimento.
-
-Não é necessário implementar funcionalidades além das solicitadas. O foco deve estar na qualidade da solução, nas decisões técnicas e na clareza da implementação.
+- Exportação de PDF não roda com muitos registros (Garantir que a exportação dos relatórios seja preparada para grandes volumes)
+- Testes automatizados, só inclui alguns cenários.
